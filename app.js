@@ -12,7 +12,7 @@ let db, session, profile, platforms = [], profiles = [], currentPage = 'overview
 
 if (!ready) setup.classList.remove('hidden');
 else {
-  db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+  db = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
   start();
 }
 
