@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#100d0c">
+  <title>Red Line Ajans | Özel Yönetim Paneli</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="setup" class="setup hidden">
+    <div class="mark">R</div><p class="eyebrow">RED LINE AJANS · ÖZEL PANEL</p><h1>Panel kurulumu bekleniyor</h1>
+    <p>Önce Supabase proje bilgileri, veritabanı tabloları ve sunucu işlevleri kurulmalı. Bu sayfa giriş sistemi hazır olmadan hesap açmaz.</p>
+    <a class="button primary" href="KURULUM.md">Kurulum adımlarını görüntüle</a>
+  </main>
+  <main id="login" class="login hidden">
+    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Açık temaya geç">☼ <span>Açık</span></button>
+    <form id="login-form" class="login-card">
+      <div class="login-head"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 17v20M18 22a8 8 0 0 0 0 10M30 22a8 8 0 0 1 0 10M12 17a16 16 0 0 0 0 20M36 17a16 16 0 0 1 0 20"/><circle cx="24" cy="13" r="3"/></svg><h1>RED LINE AJANS</h1><p>Ajans Yönetim Paneli</p></div>
+      <div class="login-body">
+        <label><span class="field-icon">♟</span>Kullanıcı adı<input name="username" autocomplete="username" required minlength="3" maxlength="32"></label>
+        <label><span class="field-icon">▣</span>Şifre<input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="button primary wide" type="submit"><span aria-hidden="true">⇥</span> Giriş Yap</button><p id="login-error" class="error" role="alert"></p>
+      </div>
+      <div class="login-foot">© 2026 RED LINE AJANS</div>
+    </form>
+  </main>
+  <div id="app" class="shell hidden">
+    <aside class="sidebar" id="sidebar"><div class="brand"><div class="brand-mark">R</div><div><b>RED LINE AJANS</b><small>Yönetim paneli</small></div></div>
+      <nav id="nav" class="nav"></nav>
+      <div class="signed-user"><div id="user-avatar" class="avatar">R</div><div><b id="user-name"></b><small id="user-role"></small></div><button id="logout" class="icon-button" title="Çıkış yap">↪</button></div>
+    </aside>
+    <main class="main"><header class="topbar"><button id="menu-toggle" class="icon-button mobile-only" aria-label="Menüyü aç">☰</button><div id="breadcrumb" class="muted">Genel Bakış</div><span class="secure-label">● Özel erişim</span></header>
+      <section class="content"><div id="notice" class="notice hidden" role="status"></div><div id="page"></div></section>
+    </main>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
