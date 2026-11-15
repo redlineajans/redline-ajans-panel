@@ -8,6 +8,7 @@ Bu klasör, gerçek giriş ve kayıt sistemi için başlangıç paketidir. Aray�
 - `supabase-config.js`: tarayıcıya konacak proje adresi ve **publishable** anahtar alanları.
 - `supabase/schema.sql`: roller, ajanslar, platformlar, yayıncılar, finans ve performans tabloları ile satır erişim kuralları. Başvurular tablosu varsa eski kayıtlarla uyumluluk için veritabanında kalır; panel menüsünde gösterilmez.
 - `supabase/migrations/2026-11-16-weekly-assistant-performance.sql`: mevcut Supabase projesine haftalık alınan telefon numarası alanını ekler.
+- `supabase/migrations/2026-11-16-role-specific-weekly-performance.sql`: mevcut projeye asistan ve danışman haftalık rapor alanlarını ekler.
 - `supabase/functions/`: kullanıcı adıyla giriş, yönetici hesabı açma/kapatma ve ilk giriş parolası yenileme işlevleri.
 
 ## Kurulum sırası
@@ -51,7 +52,14 @@ Bu sürümde Başvurular menüsü kaldırılmıştır. Kayıt asistanları Perfo
 
 Gelir/gider tutarı `1.234,56` veya `1234,56` biçiminde girilebilir. Finans ve performans kayıtlarında **Hepsi / Genel kayıt**, kaydı tek bir uygulamaya bağlamadan saklar.
 
-Var olan Supabase projesi kullanılıyorsa önce SQL Editor'de `supabase/migrations/2026-11-16-weekly-assistant-performance.sql` dosyasını çalıştır. Ardından güncel panel dosyalarını GitHub'daki `redline-ajans-panel` deposunun ana dizinine yükle.
+Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştırmadıysan `supabase/migrations/2026-11-16-weekly-assistant-performance.sql` dosyasını; ardından `supabase/migrations/2026-11-16-role-specific-weekly-performance.sql` dosyasını çalıştır. Sonra güncel panel dosyalarını GitHub'daki `redline-ajans-panel` deposunun ana dizinine yükle.
+
+## Haftalık performans raporları
+
+- Kayıt asistanı kendi adını seçerek uygulama (veya **Hepsi / Genel kayıt**), hafta başlangıç/bitiş tarihleri, alınan toplam numara ve toplam kayıt bilgisini girer.
+- Danışman kendi adını seçerek uygulama, hafta tarihleri, tamamlanan toplam kota, arka plan kotası, haftalık sorunlar ve çözüm önerilerini girer.
+- Yönetici iki rapor türünü de personel adına girebilir ve ekip kayıtlarını birlikte görebilir. Ciro katkısı yalnızca yönetici formunda bulunur.
+- Günlük performans formları bu haftalık raporlardan ayrı kalır.
 
 ## Bu sürümün sınırı
 
