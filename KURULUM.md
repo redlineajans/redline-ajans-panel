@@ -6,7 +6,8 @@ Bu klasör, gerçek giriş ve kayıt sistemi için başlangıç paketidir. Aray�
 
 - `index.html`, `style.css`, `app.js`: giriş ve panel arayüzü.
 - `supabase-config.js`: tarayıcıya konacak proje adresi ve **publishable** anahtar alanları.
-- `supabase/schema.sql`: roller, ajanslar, platformlar, başvurular, yayıncılar, finans ve performans tabloları ile satır erişim kuralları.
+- `supabase/schema.sql`: roller, ajanslar, platformlar, yayıncılar, finans ve performans tabloları ile satır erişim kuralları. Başvurular tablosu varsa eski kayıtlarla uyumluluk için veritabanında kalır; panel menüsünde gösterilmez.
+- `supabase/migrations/2026-11-16-weekly-assistant-performance.sql`: mevcut Supabase projesine haftalık alınan telefon numarası alanını ekler.
 - `supabase/functions/`: kullanıcı adıyla giriş, yönetici hesabı açma/kapatma ve ilk giriş parolası yenileme işlevleri.
 
 ## Kurulum sırası
@@ -44,6 +45,14 @@ values ('AUTH_USER_UUID', 'redlineadmin', 'AJANS_EMAIL_ADRESI', 'Yönetici Adı'
 - Parolalar kullanıcı profili tablosuna yazılmaz. Auth sağlayıcısı parolayı güvenli biçimde saklar; yönetici tarafından oluşturulan ilk parola yalnızca hesaba tanımlanırken iletilir.
 - Ücretsiz Supabase projeleri kullanılmadığında duraklatılabilir; ücretsiz planda otomatik yedekler bulunmaz. Düzenli canlı operasyon ve finans kayıtları için yedekleme planı belirlenmeden gerçek finansal verileri taşımayın.
 
+## Mevcut panel güncellemesi
+
+Bu sürümde Başvurular menüsü kaldırılmıştır. Kayıt asistanları Performans bölümünde haftalık ulaşılan telefon numarası sayısını ve o hafta tamamlanan kayıt sayısını girebilir. Hafta başlangıç ve bitiş tarihleri formda otomatik olarak doldurulur ve gerekirse değiştirilebilir. Var olan başvuru veritabanı kayıtları silinmez.
+
+Gelir/gider tutarı `1.234,56` veya `1234,56` biçiminde girilebilir. Finans ve performans kayıtlarında **Hepsi / Genel kayıt**, kaydı tek bir uygulamaya bağlamadan saklar.
+
+Var olan Supabase projesi kullanılıyorsa önce SQL Editor'de `supabase/migrations/2026-11-16-weekly-assistant-performance.sql` dosyasını çalıştır. Ardından güncel panel dosyalarını GitHub'daki `redline-ajans-panel` deposunun ana dizinine yükle.
+
 ## Bu sürümün sınırı
 
-İlk sürüm; kullanıcı adıyla giriş, ilk girişte parola değiştirme, rol bazlı ekranlar, platform listesi, başvuru/yayıncı ekleme, finans kaydı, performans kaydı ve hesap kapatma akışlarının temelini içerir. Rol bazlı erişim veritabanında da uygulanır. Üretime geçmeden önce Supabase projesi üzerinde kurulum ve gerçek kullanıcılarla erişim kontrolü ayrıca doğrulanmalıdır.
+Bu sürüm; kullanıcı adıyla giriş, ilk girişte parola değiştirme, rol bazlı ekranlar, platform listesi, yayıncı ekleme, finans kaydı, haftalık performans girişi ve hesap kapatma akışlarını içerir. Rol bazlı erişim veritabanında da uygulanır. Üretimde kullanmadan önce Supabase projesinde kurulum ve gerçek kullanıcılarla erişim ayrıca doğrulanmalıdır.

@@ -35,8 +35,27 @@ function msg(text, bad = false) {
 }
 function esc(value = '') { return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function money(value, currency = 'GBP') { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency, maximumFractionDigits: 2 }).format(Number(value || 0)); }
+function parseLocalizedAmount(value) {
+  let normalized=String(value??'').trim().replace(/\s/g,'');
+  if(!normalized)return NaN;
+  if(normalized.includes(',')&&normalized.includes('.')) {
+    normalized=normalized.lastIndexOf(',')>normalized.lastIndexOf('.')
+      ? normalized.replace(/\./g,'').replace(',','.')
+      : normalized.replace(/,/g,'');
+  } else if(normalized.includes(',')) normalized=normalized.replace(/\./g,'').replace(',','.');
+  else if(/^\d{1,3}(?:\.\d{3})+$/.test(normalized)) normalized=normalized.replace(/\./g,'');
+  const amount=Number(normalized);
+  return Number.isFinite(amount)?amount:NaN;
+}
 function niceDate(value) { return value ? new Date(`${value}T00:00:00`).toLocaleDateString('tr-TR') : '—'; }
 function today() { return new Date().toISOString().slice(0, 10); }
+function weekDates() {
+  const d = new Date(); d.setHours(0,0,0,0);
+  const day = (d.getDay() + 6) % 7;
+  const monday = new Date(d); monday.setDate(d.getDate() - day);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+  return { start:monday.toISOString().slice(0,10), end:sunday.toISOString().slice(0,10) };
+}
 function roleName(role) { return ({admin:'Yönetici',assistant:'Asistan / Kayıtçı',consultant:'Danışman',subagency_owner:'Alt ajans sahibi'})[role] || role; }
 function statusName(value) { return ({new:'Yeni',contacted:'İletişim kuruldu',reviewing:'Değerlendirmede',accepted:'Kabul edildi',declined:'Uygun değil',active:'Aktif',paused:'Duraklatıldı',left:'Ayrıldı',review:'Kontrol edilecek',inactive:'Pasif'})[value] || value; }
 
@@ -92,7 +111,6 @@ async function loadProfiles() {
 
 function buildNav() {
   const entries = [{heading:'ÇALIŞMA ALANI'},{id:'overview',icon:'▦',name:'Genel Bakış'}];
-  if (['admin','assistant','subagency_owner'].includes(profile.role)) entries.push({id:'applications',icon:'◎',name:'Başvurular'});
   if (['admin','consultant','subagency_owner'].includes(profile.role)) entries.push({id:'creators',icon:'♙',name:'Yayıncılar'});
   if (['admin','subagency_owner'].includes(profile.role)) entries.push({id:'finance',icon:'₺',name:'Gelir & Gider'});
   entries.push({id:'performance',icon:'↗',name:'Performans'});
@@ -107,13 +125,12 @@ function buildNav() {
 async function openPage(id) {
   currentPage=id;
   const platform = id.startsWith('platform:') ? platforms.find(p=>p.id===id.split(':')[1]) : null;
-  const title = platform?.name || ({overview:'Genel Bakış',applications:'Başvurular',creators:'Yayıncılar',finance:'Gelir & Gider',performance:'Performans',users:'Kullanıcı Yönetimi'}[id] || 'Panel');
+  const title = platform?.name || ({overview:'Genel Bakış',creators:'Yayıncılar',finance:'Gelir & Gider',performance:'Performans',users:'Kullanıcı Yönetimi'}[id] || 'Panel');
   document.querySelector('#breadcrumb').textContent=title;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
   msg('');
   if (profile.must_change_password) return renderPasswordChange();
   if (id==='overview') return renderOverview();
-  if (id==='applications') return renderApplications();
   if (id==='creators') return renderCreators();
   if (id==='finance') return renderFinance();
   if (id==='performance') return renderPerformance();
@@ -124,37 +141,21 @@ async function openPage(id) {
 function titleBlock(title, subtitle, action='') { return `<div class="page-title"><div><div class="eyebrow-small">Red Line Ajans · Özel panel</div><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div>${action}</div>`; }
 function cardMetric(label,value,foot='') { return `<article class="card"><div class="metric-label">${esc(label)}</div><div class="metric-value">${esc(value)}</div><div class="metric-foot">${esc(foot)}</div></article>`; }
 function table(headers, rows, empty='Henüz kayıt yok.') { return `<div class="table-scroll"><table><thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.join(''):`<tr><td colspan="${headers.length}"><div class="empty">${esc(empty)}</div></td></tr>`}</tbody></table></div>`; }
-function platformOptions(selected='') { return `<option value="">Platform seç</option>${platforms.map(p=>`<option value="${p.id}" ${p.id===selected?'selected':''}>${esc(p.name)}</option>`).join('')}`; }
+function platformOptions(selected='',includeAll=false) { return `<option value="">Platform seç</option>${includeAll?'<option value="all">Hepsi / Genel kayıt</option>':''}${platforms.map(p=>`<option value="${p.id}" ${p.id===selected?'selected':''}>${esc(p.name)}</option>`).join('')}`; }
 function roleUsersOptions(selected='') { return `<option value="">Kendime ata</option>${profiles.filter(p=>p.active).map(p=>`<option value="${p.id}" ${p.id===selected?'selected':''}>${esc(p.full_name)} · ${esc(roleName(p.role))}</option>`).join('')}`; }
 async function renderOverview() {
   const count = async tableName => { const {count}=await db.from(tableName).select('id',{count:'exact',head:true}); return count||0; };
-  const [appCount,creatorCount,financeResult,performanceResult] = await Promise.all([
-    count('applications'), count('creators'), db.from('financial_entries').select('entry_type,amount,currency'), db.from('performance_entries').select('revenue_contribution,currency')
+  const [creatorCount,financeResult,performanceResult] = await Promise.all([
+    count('creators'), db.from('financial_entries').select('entry_type,amount,currency'), db.from('performance_entries').select('revenue_contribution,currency')
   ]);
   const totals={}; (financeResult.data||[]).forEach(row=>{const c=row.currency||'GBP';totals[c]??={income:0,expense:0};totals[c][row.entry_type]+=Number(row.amount||0)});
   const rev={}; (performanceResult.data||[]).forEach(r=>{const c=r.currency||'GBP';rev[c]=(rev[c]||0)+Number(r.revenue_contribution||0)});
   const financialText=Object.keys(totals).length?Object.entries(totals).map(([c,v])=>`${c}: net ${money(v.income-v.expense,c)}`).join(' · '):'Henüz gelir/gider kaydı yok';
   const revenueText=Object.keys(rev).length?Object.entries(rev).map(([c,v])=>`${c}: ${money(v,c)}`).join(' · '):'Henüz ciro katkısı girilmedi';
-  page.innerHTML=`${titleBlock('Genel Bakış','Yetki alanındaki başvuru, yayıncı ve finans özetleri.')}
-    <div class="cards">${cardMetric('Başvuru',appCount,'Erişebildiğin kayıtlar')}${cardMetric('Yayıncı',creatorCount,'Erişebildiğin profiller')}${cardMetric('Ciro katkısı',revenueText,'Performans kayıtlarından')}${cardMetric('Gelir − gider',financialText,'Yetkine açık kayıtlar')}</div>
-    <div class="columns"><article class="card"><h2>Hızlı bağlantılar</h2><p>İşlem yapmak istediğin bölümü aç.</p><div class="form-actions"><button class="button" data-open="applications">Başvurular</button><button class="button" data-open="creators">Yayıncılar</button><button class="button" data-open="performance">Performans</button></div></article><article class="card"><h2>Güvenli erişim</h2><p>Bu oturumda yalnızca rolüne ve bağlı olduğun ekibe izin verilen kayıtlar gösterilir.</p><span class="pill">${esc(roleName(profile.role))}</span></article></div>`;
+  page.innerHTML=`${titleBlock('Genel Bakış','Yetki alanındaki yayıncı, performans ve finans özetleri.')}
+    <div class="cards">${cardMetric('Yayıncı',creatorCount,'Erişebildiğin profiller')}${cardMetric('Ciro katkısı',revenueText,'Performans kayıtlarından')}${cardMetric('Gelir − gider',financialText,'Yetkine açık kayıtlar')}</div>
+    <div class="columns"><article class="card"><h2>Hızlı bağlantılar</h2><p>İşlem yapmak istediğin bölümü aç.</p><div class="form-actions"><button class="button" data-open="creators">Yayıncılar</button><button class="button" data-open="performance">Performans</button></div></article><article class="card"><h2>Güvenli erişim</h2><p>Bu oturumda yalnızca rolüne ve bağlı olduğun ekibe izin verilen kayıtlar gösterilir.</p><span class="pill">${esc(roleName(profile.role))}</span></article></div>`;
   page.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPage(b.dataset.open)));
-}
-
-async function renderApplications() {
-  const {data,error}=await db.from('applications').select('*,platforms(name)').order('created_at',{ascending:false}).limit(100);
-  if(error) return page.innerHTML=titleBlock('Başvurular','Kayıtlı başvurular.')+`<div class="empty">${esc(error.message)}</div>`;
-  const records=data||[];
-  page.innerHTML=`${titleBlock('Başvurular','Sorumlu olduğun veya ajansına bağlı başvuruları yönet.', '<button class="button primary" id="toggle-form">＋ Yeni başvuru</button>')}
-    <article id="create-box" class="card hidden"><h2>Başvuru ekle</h2><form id="application-form" class="form-grid">
-      <label class="field">Ad soyad<input name="full_name" required></label><label class="field">Telefon<input name="phone" type="tel"></label>
-      <label class="field">E-posta<input name="email" type="email"></label><label class="field">İlgilendiği uygulama<select name="platform_id">${platformOptions()}</select></label>
-      <label class="field">Durum<select name="status"><option value="new">Yeni</option><option value="contacted">İletişim kuruldu</option><option value="reviewing">Değerlendirmede</option></select></label>
-      <label class="field">Takip tarihi<input name="follow_up_at" type="date"></label><label class="field full">İş notu<textarea name="notes" rows="2"></textarea></label>
-      <div class="form-actions full"><button class="button primary">Kaydet</button><button class="button" type="button" id="cancel-form">Vazgeç</button></div>
-    </form></article><article class="card">${table(['Ad soyad','Telefon','Uygulama','Durum','Takip'],records.map(r=>`<tr><td>${esc(r.full_name)}</td><td>${esc(r.phone||'—')}</td><td>${esc(r.platforms?.name||'—')}</td><td><span class="pill ${r.status==='new'?'review':''}">${esc(statusName(r.status))}</span></td><td>${niceDate(r.follow_up_at?.slice(0,10))}</td></tr>`),'Henüz başvuru kaydı yok.')}</article>`;
-  wireFormToggle();
-  document.querySelector('#application-form').addEventListener('submit', async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const input={full_name:f.get('full_name').trim(),phone:f.get('phone')||null,email:f.get('email')||null,platform_id:f.get('platform_id')||null,status:f.get('status'),assigned_to:profile.id,agency_id:profile.agency_id,notes:f.get('notes')||null,follow_up_at:f.get('follow_up_at')||null,created_by:profile.id};const {error}=await db.from('applications').insert(input);if(error)return msg(error.message,true);msg('Başvuru eklendi.');renderApplications();});
 }
 
 async function renderCreators() {
@@ -174,10 +175,10 @@ async function renderFinance() {
   const rows=data||[];const sums={};rows.forEach(r=>{const c=r.currency||'GBP';sums[c]??={income:0,expense:0};sums[c][r.entry_type]+=Number(r.amount)});
   const summary=Object.entries(sums).map(([c,s])=>`<div class="card"><div class="metric-label">${esc(c)} · Net toplam</div><div class="metric-value">${esc(money(s.income-s.expense,c))}</div><div class="metric-foot">Gelir ${esc(money(s.income,c))} · Gider ${esc(money(s.expense,c))}</div></div>`).join('')||cardMetric('Dönem özeti','—','Kayıt eklendikçe hesaplanır');
   page.innerHTML=`${titleBlock('Gelir & Gider','Erişim alanındaki finans kayıtlarını ve para birimine göre toplamları izle.','<button class="button primary" id="toggle-form">＋ Finans kaydı</button>')}<div class="cards">${summary}</div>
-    <article id="create-box" class="card hidden"><h2>Gelir / gider ekle</h2><form id="finance-form" class="form-grid"><label class="field">Tür<select name="entry_type"><option value="income">Gelir</option><option value="expense">Gider</option></select></label><label class="field">Kategori<input name="category" required placeholder="Örn. platform ödemesi, prodüksiyon"></label><label class="field">Tutar<input name="amount" type="number" step="0.01" min="0.01" required></label><label class="field">Para birimi<select name="currency"><option>GBP</option><option>TRY</option><option>EUR</option><option>USD</option></select></label><label class="field">Tarih<input name="occurred_on" type="date" value="${today()}" required></label><label class="field">Uygulama<select name="platform_id">${platformOptions()}</select></label><label class="field full">Açıklama<input name="description"></label><div class="form-actions full"><button class="button primary">Kaydet</button><button class="button" type="button" id="cancel-form">Vazgeç</button></div></form></article>
+    <article id="create-box" class="card hidden"><h2>Gelir / gider ekle</h2><form id="finance-form" class="form-grid"><label class="field">Tür<select name="entry_type"><option value="income">Gelir</option><option value="expense">Gider</option></select></label><label class="field">Kategori<input name="category" required placeholder="Örn. platform ödemesi, prodüksiyon"></label><label class="field">Tutar<input name="amount" type="text" inputmode="decimal" autocomplete="off" required placeholder="Örn. 1.234,56"></label><label class="field">Para birimi<select name="currency"><option>GBP</option><option>TRY</option><option>EUR</option><option>USD</option></select></label><label class="field">Tarih<input name="occurred_on" type="date" value="${today()}" required></label><label class="field">Uygulama<select name="platform_id">${platformOptions('',true)}</select></label><label class="field full">Açıklama<input name="description"></label><div class="form-actions full"><button class="button primary">Kaydet</button><button class="button" type="button" id="cancel-form">Vazgeç</button></div></form></article>
     <article class="card">${table(['Tarih','Tür','Kategori','Açıklama','Uygulama','Tutar'],rows.map(r=>`<tr><td>${niceDate(r.occurred_on)}</td><td><span class="pill ${r.entry_type==='expense'?'review':''}">${r.entry_type==='income'?'Gelir':'Gider'}</span></td><td>${esc(r.category)}</td><td>${esc(r.description||'—')}</td><td>${esc(r.platforms?.name||'—')}</td><td>${esc(money(r.amount,r.currency))}</td></tr>`),'Henüz finans kaydı yok.')}</article>`;
   wireFormToggle();
-  document.querySelector('#finance-form').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const {error}=await db.from('financial_entries').insert({entry_type:f.get('entry_type'),category:f.get('category').trim(),description:f.get('description')||null,amount:Number(f.get('amount')),currency:f.get('currency'),occurred_on:f.get('occurred_on'),platform_id:f.get('platform_id')||null,agency_id:profile.role==='subagency_owner'?profile.agency_id:null,entered_by:profile.id});if(error)return msg(error.message,true);msg('Finans kaydı eklendi.');renderFinance();});
+  document.querySelector('#finance-form').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const amount=parseLocalizedAmount(f.get('amount'));if(!Number.isFinite(amount)||amount<0.01)return msg('Tutarı 1.234,56 veya 1234,56 biçiminde gir.',true);const selectedPlatform=f.get('platform_id');const {error}=await db.from('financial_entries').insert({entry_type:f.get('entry_type'),category:f.get('category').trim(),description:f.get('description')||null,amount,currency:f.get('currency'),occurred_on:f.get('occurred_on'),platform_id:selectedPlatform&&selectedPlatform!=='all'?selectedPlatform:null,agency_id:profile.role==='subagency_owner'?profile.agency_id:null,entered_by:profile.id});if(error)return msg(error.message,true);msg('Finans kaydı eklendi.');renderFinance();});
 }
 
 async function renderPerformance() {
@@ -186,11 +187,12 @@ async function renderPerformance() {
   if(error) return page.innerHTML=titleBlock('Performans','Kişi ve ekip performans kayıtları.')+`<div class="empty">${esc(error.message)}<br>Veritabanı ilişkisi farklıysa performans listesi ilk kurulumda güncellenebilir.</div>`;
   const rows=data||[];
   const userOptions=profile.role==='admin'?`<option value="">Kişi seç</option>${profiles.filter(p=>p.active&&p.role!=='admin').map(p=>`<option value="${p.id}">${esc(p.full_name)} · ${esc(roleName(p.role))}</option>`).join('')}`:'';
-  page.innerHTML=`${titleBlock('Performans','Başvuru, kayıt, aktif yayıncı ve ciro katkısı.','<button class="button primary" id="toggle-form">＋ Performans kaydı</button>')}
-    <article id="create-box" class="card hidden"><h2>Dönem performansı gir</h2><form id="performance-form" class="form-grid">${profile.role==='admin'?`<label class="field">Personel<select name="user_id" required>${userOptions}</select></label>`:''}<label class="field">Uygulama<select name="platform_id">${platformOptions()}</select></label><label class="field">Dönem başlangıcı<input name="period_start" type="date" required></label><label class="field">Dönem bitişi<input name="period_end" type="date" required></label><label class="field">Başvuru sayısı<input name="applications_count" type="number" min="0" value="0"></label><label class="field">Kayıt sayısı<input name="registrations_count" type="number" min="0" value="0"></label><label class="field">Aktif yayıncı sayısı<input name="active_creators_count" type="number" min="0" value="0"></label><label class="field">Ciro katkısı<input name="revenue_contribution" type="number" step="0.01" min="0" value="0"></label><label class="field">Para birimi<select name="currency"><option>GBP</option><option>TRY</option><option>EUR</option><option>USD</option></select></label><label class="field full">Not<input name="note"></label><div class="form-actions full"><button class="button primary">Kaydet</button><button class="button" type="button" id="cancel-form">Vazgeç</button></div></form></article>
-    <article class="card">${table(['Personel','Alt ajans','Uygulama','Dönem','Başvuru','Kayıt','Aktif yayıncı','Ciro katkısı'],rows.map(r=>`<tr><td>${esc(r.profiles?.full_name||'—')}</td><td>${esc(r.agencies?.name||'Merkez')}</td><td>${esc(r.platforms?.name||'—')}</td><td>${niceDate(r.period_start)} – ${niceDate(r.period_end)}</td><td>${r.applications_count}</td><td>${r.registrations_count}</td><td>${r.active_creators_count}</td><td>${esc(money(r.revenue_contribution,r.currency))}</td></tr>`),'Henüz performans kaydı yok.')}</article>`;
+  const week=weekDates();
+  page.innerHTML=`${titleBlock('Performans','Kayıt asistanları her hafta ulaştığı telefon numarası ve tamamladığı kayıt toplamını buraya girer.','<button class="button primary" id="toggle-form">＋ Haftalık performans gir</button>')}
+    <article id="create-box" class="card hidden"><h2>Haftalık performans</h2><form id="performance-form" class="form-grid">${profile.role==='admin'?`<label class="field">Kayıt asistanı<select name="user_id" required>${userOptions}</select></label>`:''}<label class="field">Uygulama<select name="platform_id">${platformOptions('',true)}</select></label><label class="field">Hafta başlangıcı<input name="period_start" type="date" value="${week.start}" required></label><label class="field">Hafta bitişi<input name="period_end" type="date" value="${week.end}" required></label><label class="field">Alınan telefon numarası<input name="phone_numbers_count" type="number" min="0" step="1" value="0" required></label><label class="field">Toplam alınan kayıt<input name="registrations_count" type="number" min="0" step="1" value="0" required></label><label class="field">Aktif yayıncı sayısı<input name="active_creators_count" type="number" min="0" value="0"></label><label class="field">Ciro katkısı<input name="revenue_contribution" type="number" step="0.01" min="0" value="0"></label><label class="field">Para birimi<select name="currency"><option>GBP</option><option>TRY</option><option>EUR</option><option>USD</option></select></label><label class="field full">Not<input name="note"></label><div class="form-actions full"><button class="button primary">Kaydet</button><button class="button" type="button" id="cancel-form">Vazgeç</button></div></form></article>
+    <article class="card">${table(['Kayıt asistanı','Alt ajans','Uygulama','Hafta','Alınan numara','Toplam kayıt','Aktif yayıncı','Ciro katkısı'],rows.map(r=>`<tr><td>${esc(r.profiles?.full_name||'—')}</td><td>${esc(r.agencies?.name||'Merkez')}</td><td>${esc(r.platforms?.name||'—')}</td><td>${niceDate(r.period_start)} – ${niceDate(r.period_end)}</td><td>${Number(r.phone_numbers_count||0)}</td><td>${r.registrations_count}</td><td>${r.active_creators_count}</td><td>${esc(money(r.revenue_contribution,r.currency))}</td></tr>`),'Henüz haftalık performans kaydı yok.')}</article>`;
   wireFormToggle();
-  document.querySelector('#performance-form').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const input={user_id:profile.role==='admin'?f.get('user_id'):profile.id,agency_id:profile.role==='subagency_owner'?profile.agency_id:profiles.find(p=>p.id===f.get('user_id'))?.agency_id||null,platform_id:f.get('platform_id')||null,period_start:f.get('period_start'),period_end:f.get('period_end'),applications_count:Number(f.get('applications_count')||0),registrations_count:Number(f.get('registrations_count')||0),active_creators_count:Number(f.get('active_creators_count')||0),revenue_contribution:Number(f.get('revenue_contribution')||0),currency:f.get('currency'),note:f.get('note')||null,entered_by:profile.id};const {error}=await db.from('performance_entries').insert(input);if(error)return msg(error.message,true);msg('Performans kaydı eklendi.');renderPerformance();});
+  document.querySelector('#performance-form').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const selectedUser=profile.role==='admin'?profiles.find(p=>p.id===f.get('user_id')):profile;const input={user_id:selectedUser?.id||profile.id,agency_id:selectedUser?.agency_id||null,platform_id:f.get('platform_id')||null,period_start:f.get('period_start'),period_end:f.get('period_end'),phone_numbers_count:Number(f.get('phone_numbers_count')||0),applications_count:0,registrations_count:Number(f.get('registrations_count')||0),active_creators_count:Number(f.get('active_creators_count')||0),revenue_contribution:Number(f.get('revenue_contribution')||0),currency:f.get('currency'),note:f.get('note')||null,entered_by:profile.id};const {error}=await db.from('performance_entries').insert(input);if(error)return msg(error.message,true);msg('Haftalık performans kaydı eklendi.');renderPerformance();});
 }
 
 async function renderUsers() {
@@ -209,14 +211,13 @@ async function renderUsers() {
 }
 
 async function renderPlatform(platform) {
-  const [{data:creators},{data:apps},{data:perf}] = await Promise.all([
+  const [{data:creators},{data:perf}] = await Promise.all([
     db.from('creators').select('id,status').eq('platform_id',platform.id),
-    db.from('applications').select('id,status').eq('platform_id',platform.id),
     db.from('performance_entries').select('revenue_contribution,currency').eq('platform_id',platform.id),
   ]);
   const revenue={};(perf||[]).forEach(p=>revenue[p.currency]=(revenue[p.currency]||0)+Number(p.revenue_contribution));
   const revenueLabel=Object.keys(revenue).length?Object.entries(revenue).map(([c,v])=>`${c}: ${money(v,c)}`).join(' · '):'Henüz ciro katkısı yok';
-  page.innerHTML=`${titleBlock(platform.name,'Uygulamaya bağlı başvuru, yayıncı ve performans özeti.')}<div class="cards">${cardMetric('Uygulama durumu',statusName(platform.status),'Yönetici tarafından yönetilir')}${cardMetric('Başvuru',(apps||[]).length,'Erişim alanındaki kayıtlar')}${cardMetric('Yayıncı',(creators||[]).length,'Erişim alanındaki profiller')}${cardMetric('Ciro katkısı',revenueLabel,'Performans kayıtlarından')}</div><article class="card"><h2>Uygulama kayıtları</h2><p>Başvuru ve yayıncı listelerini ilgili menülerden bu uygulamaya göre takip edebilirsin.</p></article>`;
+  page.innerHTML=`${titleBlock(platform.name,'Bu uygulamadaki yayıncı ve performans özeti.')}<div class="cards">${cardMetric('Uygulama durumu',statusName(platform.status),'Yönetici tarafından yönetilir')}${cardMetric('Yayıncı',(creators||[]).length,'Erişim alanındaki profiller')}${cardMetric('Ciro katkısı',revenueLabel,'Performans kayıtlarından')}</div><article class="card"><h2>Uygulama kayıtları</h2><p>Yayıncı ve performans bilgilerini ilgili menülerden bu uygulamaya göre takip edebilirsin.</p></article>`;
 }
 
 function wireFormToggle() {

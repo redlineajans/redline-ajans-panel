@@ -93,6 +93,7 @@ create table if not exists public.performance_entries (
   period_start date not null,
   period_end date not null,
   applications_count integer not null default 0 check (applications_count >= 0),
+  phone_numbers_count integer not null default 0 check (phone_numbers_count >= 0),
   registrations_count integer not null default 0 check (registrations_count >= 0),
   active_creators_count integer not null default 0 check (active_creators_count >= 0),
   revenue_contribution numeric(14,2) not null default 0 check (revenue_contribution >= 0),
@@ -144,6 +145,11 @@ grant select on public.profiles, public.platforms to authenticated;
 grant select, insert, update on public.applications, public.creators to authenticated;
 grant select, insert, update, delete on public.financial_entries, public.performance_entries to authenticated;
 grant select, insert, update on public.agencies to authenticated;
+
+-- Edge Functions use the server-side secret key for login and account administration.
+-- Grant only the table operations those functions need; never expose this key in the browser.
+grant select, insert, update on public.profiles to service_role;
+grant select, insert, delete on public.agencies to service_role;
 
 drop policy if exists profiles_read_scope on public.profiles;
 create policy profiles_read_scope on public.profiles for select to authenticated
