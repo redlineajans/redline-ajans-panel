@@ -11,6 +11,7 @@ Bu klasör, gerçek giriş ve kayıt sistemi için başlangıç paketidir. Aray�
 - `supabase/migrations/2026-11-16-role-specific-weekly-performance.sql`: mevcut projeye asistan ve danışman haftalık rapor alanlarını ekler.
 - `supabase/migrations/2026-11-16-admin-only-delete-creators.sql`: yayıncı kayıtlarını yalnızca yöneticinin silebilmesini sağlar.
 - `supabase/migrations/2026-11-16-employee-payment-table.sql`: yöneticiye özel çalışan ödeme tablosu ile personele yalnızca kendi ödeme durumunu gösteren güvenli işlevi ekler.
+- `supabase/migrations/2026-11-16-employee-assistant-payment-group.sql`: kayıt asistanlarını tüm uygulamalardan bağımsız gruba alır; bu ödemelerin giderlerini genel kayıt olarak işler.
 - `supabase/functions/`: kullanıcı adıyla giriş, yönetici hesabı açma/kapatma ve ilk giriş parolası yenileme işlevleri.
 
 ## Kurulum sırası
@@ -80,10 +81,11 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 ## Çalışan ödeme tablosu
 
 - **Çalışma Alanı → Çalışan Ödeme Tablosu** yalnızca yöneticiye görünür. Çalışanları aktif uygulamalar altında ekleyip iletişim, IBAN, Binance TRC20, aylık/haftalık ödeme, asgari ücret, borç notu, para birimi ve aktiflik bilgilerini burada yönetebilirsin.
+- Kayıt asistanları **Kayıt Asistanları · Tüm uygulamalar** grubunda ayrı görünür. Bu gruptaki ödemeler belirli bir platforma bağlanmadan **Hepsi / Genel kayıt** gideri olarak işlenir. Diğer çalışanları uygulama grubuna eklemeye devam et.
 - Bir çalışanı panel hesabıyla eşleştirirsen o hesapta **Ödeme Durumum** menüsü çıkar. Çalışan yalnızca kendisine bağlı haftalık/aylık dönemin başlangıç-bitişini ve “Ödendi / Ödenmedi” durumunu görür; tutarları, ödeme geçmişini, IBAN/TRC20'yi ve borç notunu göremez. Eşleştirme yapılmayan çalışana ödeme durumu gösterilmez.
 - Yönetici **Ödeme ekle** ile ödeme türü, dönem, ödenecek tutar, şimdi ödenen tutar ve tarihi girer. Ödeme otomatik olarak uygulamaya bağlı gider olarak eklenir. Kısmi ödeme girilirse kalan tutar beklemede kalır ve aynı döneme ek ödeme girilebilir.
 - Ödeme düzeltme/silme yalnızca yönetici ödeme geçmişinden yapılır; bağlı gider kaydı da birlikte silinir. Gelir & Gider ekranında çalışan ödeme giderleri salt görüntülenir.
-- Mevcut Supabase projesinde `supabase/migrations/2026-11-16-employee-payment-table.sql` dosyasını SQL Editor'de bir kez çalıştır. Sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükleyip commit et. Çalışan hesabı varsa, ödeme tablosundaki çalışan kaydını o hesapla eşleştir.
+- Daha önce çalışan ödeme tablosu SQL'ini çalıştırdıysan yalnızca yeni `supabase/migrations/2026-11-16-employee-assistant-payment-group.sql` dosyasını Supabase SQL Editor'de bir kez çalıştır. İlk ödeme tablosu SQL'ini henüz çalıştırmadıysan önce `supabase/migrations/2026-11-16-employee-payment-table.sql`, ardından bu yeni dosyayı çalıştır. Sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükleyip commit et. Çalışan hesabı varsa, ödeme tablosundaki çalışan kaydını o hesapla eşleştir.
 
 ## Bu sürümün sınırı
 
