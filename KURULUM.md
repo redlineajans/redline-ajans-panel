@@ -6,10 +6,11 @@ Bu klasör, gerçek giriş ve kayıt sistemi için başlangıç paketidir. Aray�
 
 - `index.html`, `style.css`, `app.js`: giriş ve panel arayüzü.
 - `supabase-config.js`: tarayıcıya konacak proje adresi ve **publishable** anahtar alanları.
-- `supabase/schema.sql`: roller, ajanslar, platformlar, eski yayıncı kayıtları, finans, performans ve özel dosya raporu arşivi tabloları ile erişim kuralları. Başvurular ve eski yayıncı verileri varsa uyumluluk için veritabanında kalır; panel menüsünde gösterilmez.
+- `supabase/schema.sql`: roller, ajanslar, platformlar, eski yayıncı kayıtları, finans, performans, dosya raporu arşivi ve çalışan ödeme tabloları ile erişim kuralları. Başvurular ve eski yayıncı verileri varsa uyumluluk için veritabanında kalır; panel menüsünde gösterilmez.
 - `supabase/migrations/2026-11-16-weekly-assistant-performance.sql`: mevcut Supabase projesine haftalık alınan telefon numarası alanını ekler.
 - `supabase/migrations/2026-11-16-role-specific-weekly-performance.sql`: mevcut projeye asistan ve danışman haftalık rapor alanlarını ekler.
 - `supabase/migrations/2026-11-16-admin-only-delete-creators.sql`: yayıncı kayıtlarını yalnızca yöneticinin silebilmesini sağlar.
+- `supabase/migrations/2026-11-16-employee-payment-table.sql`: yöneticiye özel çalışan ödeme tablosu ile personele yalnızca kendi ödeme durumunu gösteren güvenli işlevi ekler.
 - `supabase/functions/`: kullanıcı adıyla giriş, yönetici hesabı açma/kapatma ve ilk giriş parolası yenileme işlevleri.
 
 ## Kurulum sırası
@@ -76,6 +77,14 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 - Alt ajans sahibi sadece kendi ajansına atanmış dosya raporlarını görür. Kayıt asistanı kendi haftalık kayıtlarını Performans bölümünde görür; diğer personelin veya dosya raporlarının arşivine erişmez.
 - Yükleme ve silme yalnızca yöneticiye açıktır. Rapor dosyalarını ve erişim kurallarını eklemek için mevcut Supabase projesinde `supabase/migrations/2026-11-16-private-platform-reports.sql` dosyasını SQL Editor'de bir kez çalıştır; önceki platform/performance migration dosyalarını tekrar çalıştırma.
 
+## Çalışan ödeme tablosu
+
+- **Çalışma Alanı → Çalışan Ödeme Tablosu** yalnızca yöneticiye görünür. Çalışanları aktif uygulamalar altında ekleyip iletişim, IBAN, Binance TRC20, aylık/haftalık ödeme, asgari ücret, borç notu, para birimi ve aktiflik bilgilerini burada yönetebilirsin.
+- Bir çalışanı panel hesabıyla eşleştirirsen o hesapta **Ödeme Durumum** menüsü çıkar. Çalışan yalnızca kendisine bağlı haftalık/aylık dönemin başlangıç-bitişini ve “Ödendi / Ödenmedi” durumunu görür; tutarları, ödeme geçmişini, IBAN/TRC20'yi ve borç notunu göremez. Eşleştirme yapılmayan çalışana ödeme durumu gösterilmez.
+- Yönetici **Ödeme ekle** ile ödeme türü, dönem, ödenecek tutar, şimdi ödenen tutar ve tarihi girer. Ödeme otomatik olarak uygulamaya bağlı gider olarak eklenir. Kısmi ödeme girilirse kalan tutar beklemede kalır ve aynı döneme ek ödeme girilebilir.
+- Ödeme düzeltme/silme yalnızca yönetici ödeme geçmişinden yapılır; bağlı gider kaydı da birlikte silinir. Gelir & Gider ekranında çalışan ödeme giderleri salt görüntülenir.
+- Mevcut Supabase projesinde `supabase/migrations/2026-11-16-employee-payment-table.sql` dosyasını SQL Editor'de bir kez çalıştır. Sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükleyip commit et. Çalışan hesabı varsa, ödeme tablosundaki çalışan kaydını o hesapla eşleştir.
+
 ## Bu sürümün sınırı
 
-Bu sürüm; kullanıcı adıyla giriş, ilk girişte parola değiştirme, rol bazlı ekranlar, platform listesi, dosya raporu arşivi, finans kaydı, haftalık performans girişi, danışman uygulama ataması ve hesap kapatma akışlarını içerir. Eski yayıncı verileri veritabanında korunur ancak panelde ayrı bir Yayıncılar bölümü gösterilmez. Rol bazlı erişim veritabanında da uygulanır.
+Bu sürüm; kullanıcı adıyla giriş, ilk girişte parola değiştirme, rol bazlı ekranlar, platform listesi, dosya raporu arşivi, çalışan ödeme tablosu, otomatik gider kaydı, finans kaydı, haftalık performans girişi, danışman uygulama ataması ve hesap kapatma akışlarını içerir. Eski yayıncı verileri veritabanında korunur ancak panelde ayrı bir Yayıncılar bölümü gösterilmez. Rol bazlı erişim veritabanında da uygulanır.

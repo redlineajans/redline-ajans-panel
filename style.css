@@ -55,4 +55,5 @@
 .platform-check input{width:auto;accent-color:var(--red)}
 input[type=file]{padding:9px;font-size:12px}
 @media(max-width:680px){.report-filters{grid-template-columns:1fr;width:100%}}
+.payment-groups{display:grid;gap:14px}.payment-group{padding:15px 12px}.payment-group-title{display:flex;align-items:center;gap:10px;margin:0 4px 10px}.payment-group-title h2{margin:0}.payment-period{display:block;margin-top:4px;white-space:nowrap}.payment-actions{display:flex;gap:5px;flex-wrap:wrap}.payment-actions .button{padding:7px 9px;font-size:11px}.private-value{max-width:190px;overflow-wrap:anywhere;white-space:normal}.payment-group table{min-width:1250px}#payment-form-box,#payee-form-box,#payment-history-box{margin-bottom:14px}
 
