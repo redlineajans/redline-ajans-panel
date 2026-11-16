@@ -42,7 +42,7 @@ values ('AUTH_USER_UUID', 'redlineadmin', 'AJANS_EMAIL_ADRESI', 'Yönetici Adı'
 - `sb_secret_...` anahtarı veya eski `service_role` anahtarı **asla** GitHub deposuna, `supabase-config.js` dosyasına ya da personele gönderilen dosyalara konmamalı. Supabase Edge Functions, kendi yönetilen secret key'lerini sunucu tarafında kullanır.
 - GitHub Pages kaynak kodu herkese açık olabilir; güvenliği veritabanı RLS kuralları sağlar. Özel başvuru/finans verisi HTML'e sabit yazılmaz.
 - Panel giriş ekranı robots noindex ile işaretli; bu yalnızca arama motoru ipucudur. Yetkiyi tek başına sağlamaz. Veritabanı erişimi oturum/rol/ajans kurallarıyla korunur.
-- Tanchat–Tanstar, Linky AI, Layla, Timo, Sohbi ve Simi aktif iş birliği platformlarıdır.
+- Tanchat–Tanstar, Linky AI, Layla–Nivi, Timo, Sohbi ve Simi aktif iş birliği platformlarıdır.
 - Parolalar kullanıcı profili tablosuna yazılmaz. Auth sağlayıcısı parolayı güvenli biçimde saklar; yönetici tarafından oluşturulan ilk parola yalnızca hesaba tanımlanırken iletilir.
 - Ücretsiz Supabase projeleri kullanılmadığında duraklatılabilir; ücretsiz planda otomatik yedekler bulunmaz. Düzenli canlı operasyon ve finans kayıtları için yedekleme planı belirlenmeden gerçek finansal verileri taşımayın.
 
@@ -62,7 +62,7 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 - Günlük performans formları bu haftalık raporlardan ayrı kalır.
 - Yönetici ve alt ajans görünümünde performans kayıtları türlerine göre filtrelenir; tabloda asistan numara/kayıt sayıları ile danışman kota alanları ayrı sütunlarda gösterilir.
 - Dar ekranlarda menü açılır; menü dışındaki alana dokununca veya bir bölüm seçince kapanır. Telefonda tarayıcının “Masaüstü sitesi” seçeneği kapalı olmalıdır.
-- Mevcut Supabase projesine Simi platformunu eklemek için `supabase/migrations/2026-11-16-add-simi-platform.sql` dosyasını SQL Editor'de bir kez çalıştır.
+- Mevcut Supabase projesinde Layla'yı Layla–Nivi olarak güncellemek, Sohbi'yi aktifleştirmek ve Simi'yi eklemek için `supabase/migrations/2026-11-16-platform-menu-updates.sql` dosyasını SQL Editor'de bir kez çalıştır.
 
 ## Bu sürümün sınırı
 
