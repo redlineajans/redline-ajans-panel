@@ -147,7 +147,8 @@ alter table public.performance_entries enable row level security;
 revoke all on public.agencies, public.profiles, public.platforms, public.applications,
   public.creators, public.financial_entries, public.performance_entries from anon, authenticated;
 grant select on public.profiles, public.platforms to authenticated;
-grant select, insert, update on public.applications, public.creators to authenticated;
+grant select, insert, update on public.applications to authenticated;
+grant select, insert, update, delete on public.creators to authenticated;
 grant select, insert, update, delete on public.financial_entries, public.performance_entries to authenticated;
 grant select, insert, update on public.agencies to authenticated;
 
@@ -208,6 +209,8 @@ using (public.current_profile_role() is not null and (public.is_admin() or
 with check (public.current_profile_role() is not null and (public.is_admin() or
   (consultant_id = auth.uid() and agency_id is not distinct from public.current_agency_id()) or
   (public.current_profile_role() = 'subagency_owner' and agency_id = public.current_agency_id())));
+drop policy if exists creators_delete_admin_only on public.creators;
+create policy creators_delete_admin_only on public.creators for delete to authenticated using (public.is_admin());
 
 drop policy if exists finance_read_scope on public.financial_entries;
 create policy finance_read_scope on public.financial_entries for select to authenticated

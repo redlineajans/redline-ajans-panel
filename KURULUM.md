@@ -9,6 +9,7 @@ Bu klasör, gerçek giriş ve kayıt sistemi için başlangıç paketidir. Aray�
 - `supabase/schema.sql`: roller, ajanslar, platformlar, yayıncılar, finans ve performans tabloları ile satır erişim kuralları. Başvurular tablosu varsa eski kayıtlarla uyumluluk için veritabanında kalır; panel menüsünde gösterilmez.
 - `supabase/migrations/2026-11-16-weekly-assistant-performance.sql`: mevcut Supabase projesine haftalık alınan telefon numarası alanını ekler.
 - `supabase/migrations/2026-11-16-role-specific-weekly-performance.sql`: mevcut projeye asistan ve danışman haftalık rapor alanlarını ekler.
+- `supabase/migrations/2026-11-16-admin-only-delete-creators.sql`: yayıncı kayıtlarını yalnızca yöneticinin silebilmesini sağlar.
 - `supabase/functions/`: kullanıcı adıyla giriş, yönetici hesabı açma/kapatma ve ilk giriş parolası yenileme işlevleri.
 
 ## Kurulum sırası
@@ -63,6 +64,8 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 - Yönetici ve alt ajans görünümünde performans kayıtları türlerine göre filtrelenir; tabloda asistan numara/kayıt sayıları ile danışman kota alanları ayrı sütunlarda gösterilir.
 - Dar ekranlarda menü açılır; menü dışındaki alana dokununca veya bir bölüm seçince kapanır. Telefonda tarayıcının “Masaüstü sitesi” seçeneği kapalı olmalıdır.
 - Mevcut Supabase projesinde Layla'yı Layla–Nivi olarak güncellemek, Sohbi'yi aktifleştirmek ve Simi'yi eklemek için `supabase/migrations/2026-11-16-platform-menu-updates.sql` dosyasını SQL Editor'de bir kez çalıştır.
+- Asistan/kayıtçı ve danışman kendi yetki alanındaki yayıncı ve performans kayıtlarını düzenleyebilir. Alt ajans sahibi de kendi ajansına açık finans/yayıncı kayıtlarını düzenleyebilir. Kayıt silme ekranı yalnızca yöneticiye açıktır; veritabanı kuralları da silmeyi yöneticiyle sınırlar.
+- Mevcut Supabase projesinde yayıncı silme iznini yöneticiye eklemek için `supabase/migrations/2026-11-16-admin-only-delete-creators.sql` dosyasını SQL Editor'de bir kez çalıştır.
 
 ## Bu sürümün sınırı
 
