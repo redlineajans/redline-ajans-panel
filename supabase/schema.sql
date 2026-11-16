@@ -36,7 +36,7 @@ create table if not exists public.platforms (
 );
 
 insert into public.platforms(name,status) values
- ('Tanchat – Tanstar','active'), ('Linky AI','active'), ('Layla','active'), ('Timo','active'), ('Sohbi','review')
+ ('Tanchat – Tanstar','active'), ('Linky AI','active'), ('Layla','active'), ('Timo','active'), ('Sohbi','active'), ('Simi','active')
 on conflict(name) do nothing;
 
 create table if not exists public.applications (

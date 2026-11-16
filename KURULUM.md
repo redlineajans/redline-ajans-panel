@@ -42,7 +42,7 @@ values ('AUTH_USER_UUID', 'redlineadmin', 'AJANS_EMAIL_ADRESI', 'Yönetici Adı'
 - `sb_secret_...` anahtarı veya eski `service_role` anahtarı **asla** GitHub deposuna, `supabase-config.js` dosyasına ya da personele gönderilen dosyalara konmamalı. Supabase Edge Functions, kendi yönetilen secret key'lerini sunucu tarafında kullanır.
 - GitHub Pages kaynak kodu herkese açık olabilir; güvenliği veritabanı RLS kuralları sağlar. Özel başvuru/finans verisi HTML'e sabit yazılmaz.
 - Panel giriş ekranı robots noindex ile işaretli; bu yalnızca arama motoru ipucudur. Yetkiyi tek başına sağlamaz. Veritabanı erişimi oturum/rol/ajans kurallarıyla korunur.
-- Sohbi başlangıçta **kontrol edilecek** durumundadır. Tanchat–Tanstar, Linky AI, Layla ve Timo aktif olarak işaretlenmiştir; panelde durumlar yönetilebilir hale getirilecek.
+- Tanchat–Tanstar, Linky AI, Layla, Timo, Sohbi ve Simi aktif iş birliği platformlarıdır.
 - Parolalar kullanıcı profili tablosuna yazılmaz. Auth sağlayıcısı parolayı güvenli biçimde saklar; yönetici tarafından oluşturulan ilk parola yalnızca hesaba tanımlanırken iletilir.
 - Ücretsiz Supabase projeleri kullanılmadığında duraklatılabilir; ücretsiz planda otomatik yedekler bulunmaz. Düzenli canlı operasyon ve finans kayıtları için yedekleme planı belirlenmeden gerçek finansal verileri taşımayın.
 
@@ -60,6 +60,9 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 - Danışman kendi adını seçerek uygulama, hafta tarihleri, tamamlanan toplam kota, arka plan kotası, haftalık sorunlar ve çözüm önerilerini girer.
 - Yönetici iki rapor türünü de personel adına girebilir ve ekip kayıtlarını birlikte görebilir. Ciro katkısı yalnızca yönetici formunda bulunur.
 - Günlük performans formları bu haftalık raporlardan ayrı kalır.
+- Yönetici ve alt ajans görünümünde performans kayıtları türlerine göre filtrelenir; tabloda asistan numara/kayıt sayıları ile danışman kota alanları ayrı sütunlarda gösterilir.
+- Dar ekranlarda menü açılır; menü dışındaki alana dokununca veya bir bölüm seçince kapanır. Telefonda tarayıcının “Masaüstü sitesi” seçeneği kapalı olmalıdır.
+- Mevcut Supabase projesine Simi platformunu eklemek için `supabase/migrations/2026-11-16-add-simi-platform.sql` dosyasını SQL Editor'de bir kez çalıştır.
 
 ## Bu sürümün sınırı
 

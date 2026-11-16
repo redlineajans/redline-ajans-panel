@@ -119,7 +119,7 @@ function buildNav() {
   platforms.forEach(p=>entries.push({id:`platform:${p.id}`,icon:p.name.slice(0,1).toUpperCase(),name:p.name,status:p.status}));
   const nav=document.querySelector('#nav');
   nav.innerHTML=entries.map(item=>item.heading?`<div class="nav-heading">${esc(item.heading)}</div>`:`<button data-page="${esc(item.id)}" class="${item.id===currentPage?'active':''}"><span class="nav-symbol">${esc(item.icon)}</span>${esc(item.name)}${item.status?`<span class="nav-status">${item.status==='active'?'Aktif':item.status==='review'?'Kontrol':'Pasif'}</span>`:''}</button>`).join('');
-  nav.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>openPage(button.dataset.page)));
+  nav.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>{closeMenu();openPage(button.dataset.page);}));
 }
 
 async function openPage(id) {
@@ -195,22 +195,28 @@ async function renderPerformance() {
   const consultantFields=`<div class="form-grid full"><label class="field">Bu hafta yapılan toplam kota<input name="quota_completed" type="number" min="0" step="1" value="0" required></label><label class="field">Arka plan kotası<input name="background_quota" type="number" min="0" step="1" value="0" required></label><label class="field full">Haftalık sorunlar<textarea name="weekly_issues" rows="3" placeholder="Bu hafta karşılaşılan sorunları yazın"></textarea></label><label class="field full">Çözüm önerileri<textarea name="solution_suggestions" rows="3" placeholder="Önerilen çözümleri yazın"></textarea></label></div>`;
   const initialType=profile.role==='consultant'?'consultant':'assistant';
   const adminType=profile.role==='admin'?`<label class="field">Rapor türü<select name="report_type"><option value="assistant">Kayıt asistanı haftalık raporu</option><option value="consultant">Danışman haftalık raporu</option></select></label>`:'';
-  const fieldsFor=(role)=>`${userSelect(role)}<label class="field">Uygulama<select name="platform_id">${platformOptions('',true)}</select></label><label class="field">Hafta başlangıcı<input name="period_start" type="date" value="${week.start}" required></label><label class="field">Hafta bitişi<input name="period_end" type="date" value="${week.end}" required></label><div class="role-fields full" data-role-fields="assistant" ${role==='consultant'?'hidden':''}>${assistantFields}</div><div class="role-fields full" data-role-fields="consultant" ${role!=='consultant'?'hidden':''}>${consultantFields}</div>${profile.role==='admin'?`<div class="form-grid full"><label class="field">Yönetici ciro katkısı (isteğe bağlı)<input name="revenue_contribution" type="number" step="0.01" min="0" value="0"></label><label class="field">Para birimi<select name="currency"><option>GBP</option><option>TRY</option><option>EUR</option><option>USD</option></select></label></div>`:''}<div class="form-actions full"><button class="button primary">Kaydet</button><button class="button" type="button" id="cancel-form">Vazgeç</button></div>`;
+  const fieldsFor=(role)=>`${userSelect(role)}<label class="field">Uygulama<select name="platform_id">${platformOptions('',true)}</select></label><label class="field">Hafta başlangıcı<input name="period_start" type="date" value="${week.start}" required></label><label class="field">Hafta bitişi<input name="period_end" type="date" value="${week.end}" required></label>${role==='consultant'?consultantFields:assistantFields}${profile.role==='admin'?`<div class="form-grid full"><label class="field">Yönetici ciro katkısı (isteğe bağlı)<input name="revenue_contribution" type="number" step="0.01" min="0" value="0"></label><label class="field">Para birimi<select name="currency"><option>GBP</option><option>TRY</option><option>EUR</option><option>USD</option></select></label></div>`:''}<div class="form-actions full"><button class="button primary">Kaydet</button><button class="button" type="button" id="cancel-form">Vazgeç</button></div>`;
   const adminForm=`<form id="performance-form" class="form-grid">${adminType}<div id="performance-fields" class="form-grid full">${fieldsFor(initialType)}</div></form>`;
   const selfForm=`<form id="performance-form" class="form-grid">${fieldsFor(initialType)}</form>`;
   const heading=profile.role==='consultant'?'Danışman haftalık raporu':profile.role==='admin'?'Haftalık ekip performansı':'Kayıt asistanı haftalık performansı';
   const subtitle=profile.role==='consultant'?'Danışmanlar kendi uygulamalarına ait haftalık kota, arka plan kotası, sorun ve çözüm raporunu girer.':'Kayıt asistanları yalnızca haftalık numara ve kayıt toplamlarını girer.';
-  const displayRows=rows.map(r=>{
+  const makeRow=(r)=>{
     const kind=r.report_type||'assistant';
+    const common=`<td>${esc(r.profiles?.full_name||'—')}</td>${profile.role==='admin'||profile.role==='subagency_owner'?`<td>${kind==='consultant'?'Danışman':'Kayıt asistanı'}</td>`:''}<td>${esc(r.agencies?.name||'Merkez')}</td><td>${esc(r.platforms?.name||'Hepsi / Genel kayıt')}</td><td>${niceDate(r.period_start)} – ${niceDate(r.period_end)}</td>`;
+    if(profile.role==='admin'||profile.role==='subagency_owner') return `<tr>${common}<td>${kind==='assistant'?Number(r.phone_numbers_count||0):'—'}</td><td>${kind==='assistant'?Number(r.registrations_count||0):'—'}</td><td>${kind==='consultant'?Number(r.quota_completed||0):'—'}</td><td>${kind==='consultant'?Number(r.background_quota||0):'—'}</td><td>${kind==='consultant'?esc(r.weekly_issues||'—'):'—'}</td><td>${kind==='consultant'?esc(r.solution_suggestions||'—'):'—'}</td>${profile.role==='admin'?`<td>${esc(money(r.revenue_contribution,r.currency))}</td>`:''}</tr>`;
     const detail=kind==='consultant'?`<td>${Number(r.quota_completed||0)}</td><td>${Number(r.background_quota||0)}</td><td>${esc(r.weekly_issues||'—')}</td><td>${esc(r.solution_suggestions||'—')}</td>`:`<td>${Number(r.phone_numbers_count||0)}</td><td>${Number(r.registrations_count||0)}</td>`;
-    return `<tr><td>${esc(r.profiles?.full_name||'—')}</td>${profile.role==='admin'?`<td>${kind==='consultant'?'Danışman':'Kayıt asistanı'}</td>`:''}<td>${esc(r.agencies?.name||'Merkez')}</td><td>${esc(r.platforms?.name||'Hepsi / Genel kayıt')}</td><td>${niceDate(r.period_start)} – ${niceDate(r.period_end)}</td>${detail}${profile.role==='admin'?`<td>${esc(money(r.revenue_contribution,r.currency))}</td>`:''}</tr>`;
-  });
-  const columns=profile.role==='admin'?['Ad soyad','Rapor türü','Alt ajans','Uygulama','Hafta','Toplam kota','Arka plan kotası','Haftalık sorunlar','Çözüm önerileri','Ciro katkısı']
+    return `<tr>${common}${detail}</tr>`;
+  };
+  const columns=profile.role==='admin'||profile.role==='subagency_owner'?['Ad soyad','Rapor türü','Alt ajans','Uygulama','Hafta','Alınan toplam numara','Toplam alınan kayıt','Toplam kota','Arka plan kotası','Haftalık sorunlar','Çözüm önerileri',...(profile.role==='admin'?['Ciro katkısı']:[])]
     :reportRole==='consultant'?['Danışman','Alt ajans','Uygulama','Hafta','Toplam kota','Arka plan kotası','Haftalık sorunlar','Çözüm önerileri']
     :['Kayıt asistanı','Alt ajans','Uygulama','Hafta','Alınan toplam numara','Toplam alınan kayıt'];
+  const filterable=profile.role==='admin'||profile.role==='subagency_owner';
+  const initialVisibleRows=filterable?rows:rows.filter(r=>(r.report_type||'assistant')===reportRole);
   page.innerHTML=`${titleBlock('Performans',subtitle,'<button class="button primary" id="toggle-form">＋ Haftalık rapor gir</button>')}
     <article id="create-box" class="card hidden"><h2>${heading}</h2>${profile.role==='admin'?adminForm:selfForm}</article>
-    <article class="card">${table(columns,displayRows,'Henüz haftalık performans kaydı yok.')}</article>`;
+    ${filterable?`<div class="section-head"><strong>Haftalık raporlar</strong><label class="field" style="min-width:220px;margin:0"><span class="small">Rapor türü filtresi</span><select id="performance-filter"><option value="all">Tüm rapor türleri</option><option value="assistant">Kayıt asistanları</option><option value="consultant">Danışmanlar</option></select></label></div>`:''}
+    <article class="card" id="performance-table-card">${table(columns,initialVisibleRows.map(makeRow),'Henüz haftalık performans kaydı yok.')}</article>`;
+  if(filterable) document.querySelector('#performance-filter').addEventListener('change',event=>{const selected=event.currentTarget.value;const visible=selected==='all'?rows:rows.filter(r=>(r.report_type||'assistant')===selected);document.querySelector('#performance-table-card').innerHTML=table(columns,visible.map(makeRow),'Bu rapor türünde kayıt yok.');});
   wireFormToggle();
   const form=document.querySelector('#performance-form');
   if(profile.role==='admin') {
@@ -264,7 +270,12 @@ function renderPasswordChange() {
   document.querySelector('#change-password').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);if(f.get('password')!==f.get('confirm'))return msg('Parolalar eşleşmiyor.',true);const {error}=await db.auth.updateUser({password:f.get('password')});if(error)return msg(error.message,true);const {data:{session:current}}=await db.auth.getSession();const result=await invoke('complete-password-change',{});if(!result.ok)return msg(result.error||'Parola durumu güncellenemedi.',true);profile.must_change_password=false;msg('Parolan güncellendi.');await openPage('overview');});
 }
 document.querySelector('#logout').addEventListener('click',async()=>{await db.auth.signOut();profile=null;showLogin();});
-document.querySelector('#menu-toggle').addEventListener('click',()=>document.querySelector('#sidebar').classList.toggle('open'));
+const sidebar=document.querySelector('#sidebar');
+const menuBackdrop=document.querySelector('#menu-backdrop');
+function closeMenu(){sidebar.classList.remove('open');menuBackdrop?.classList.remove('open');}
+document.querySelector('#menu-toggle').addEventListener('click',()=>{const opened=sidebar.classList.toggle('open');menuBackdrop?.classList.toggle('open',opened);});
+menuBackdrop?.addEventListener('click',closeMenu);
+document.addEventListener('keydown',event=>{if(event.key==='Escape')closeMenu();});
 document.querySelector('#theme-toggle').addEventListener('click',event=>{
   const light=document.querySelector('#login').classList.toggle('light');
   event.currentTarget.querySelector('span').textContent=light?'Koyu':'Açık';
