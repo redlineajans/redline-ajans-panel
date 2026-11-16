@@ -6,7 +6,7 @@ Bu klasör, gerçek giriş ve kayıt sistemi için başlangıç paketidir. Aray�
 
 - `index.html`, `style.css`, `app.js`: giriş ve panel arayüzü.
 - `supabase-config.js`: tarayıcıya konacak proje adresi ve **publishable** anahtar alanları.
-- `supabase/schema.sql`: roller, ajanslar, platformlar, yayıncılar, finans ve performans tabloları ile satır erişim kuralları. Başvurular tablosu varsa eski kayıtlarla uyumluluk için veritabanında kalır; panel menüsünde gösterilmez.
+- `supabase/schema.sql`: roller, ajanslar, platformlar, eski yayıncı kayıtları, finans, performans ve özel dosya raporu arşivi tabloları ile erişim kuralları. Başvurular ve eski yayıncı verileri varsa uyumluluk için veritabanında kalır; panel menüsünde gösterilmez.
 - `supabase/migrations/2026-11-16-weekly-assistant-performance.sql`: mevcut Supabase projesine haftalık alınan telefon numarası alanını ekler.
 - `supabase/migrations/2026-11-16-role-specific-weekly-performance.sql`: mevcut projeye asistan ve danışman haftalık rapor alanlarını ekler.
 - `supabase/migrations/2026-11-16-admin-only-delete-creators.sql`: yayıncı kayıtlarını yalnızca yöneticinin silebilmesini sağlar.
@@ -64,9 +64,18 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 - Yönetici ve alt ajans görünümünde performans kayıtları türlerine göre filtrelenir; tabloda asistan numara/kayıt sayıları ile danışman kota alanları ayrı sütunlarda gösterilir.
 - Dar ekranlarda menü açılır; menü dışındaki alana dokununca veya bir bölüm seçince kapanır. Telefonda tarayıcının “Masaüstü sitesi” seçeneği kapalı olmalıdır.
 - Mevcut Supabase projesinde Layla'yı Layla–Nivi olarak güncellemek, Sohbi'yi aktifleştirmek ve Simi'yi eklemek için `supabase/migrations/2026-11-16-platform-menu-updates.sql` dosyasını SQL Editor'de bir kez çalıştır.
-- Asistan/kayıtçı ve danışman kendi yetki alanındaki yayıncı ve performans kayıtlarını düzenleyebilir. Alt ajans sahibi de kendi ajansına açık finans/yayıncı kayıtlarını düzenleyebilir. Kayıt silme ekranı yalnızca yöneticiye açıktır; veritabanı kuralları da silmeyi yöneticiyle sınırlar.
+- Asistan/kayıtçı kendi performans raporlarını, danışman kendi performans raporlarını ve kendisine atanmış uygulamaların rapor dosyalarını görebilir. Alt ajans sahibi kendi ajansına atanmış rapor dosyalarını görür. Rapor dosyası yükleme ve silme yalnızca yöneticiye açıktır.
 - Mevcut Supabase projesinde yayıncı silme iznini yöneticiye eklemek için `supabase/migrations/2026-11-16-admin-only-delete-creators.sql` dosyasını SQL Editor'de bir kez çalıştır.
+
+## Dosya raporları
+
+- Raporlar bölümü eski Yayıncılar bağlantısının yerini alır. Eski yayıncı kayıtları veritabanından silinmez.
+- Yönetici günlük veya haftalık rapor olarak XLSX, XLS, CSV, PDF, JPG, PNG, WEBP veya GIF yükleyebilir. Tek dosya sınırı 20 MB'tır; rapor başına uygulama ve dönem zorunludur. İstenirse alt ajans seçilir. Dosyaların içeriği satır satır panele aktarılmaz; dosya olarak saklanır.
+- Dosyalar `platform-reports` adlı **özel** Supabase Storage alanında tutulur. Dosya bağlantıları süreli olarak oluşturulur; herkese açık link üretilmez.
+- Danışmanların rapor erişimi uygulamaya göre belirlenir. Güncel panelde **Kullanıcı Yönetimi → Uygulamaları ata** ile her danışmanın sorumlu olduğu uygulamaları seç. Danışman sadece bu uygulamalara ait raporları görür.
+- Alt ajans sahibi sadece kendi ajansına atanmış dosya raporlarını görür. Kayıt asistanı kendi haftalık kayıtlarını Performans bölümünde görür; diğer personelin veya dosya raporlarının arşivine erişmez.
+- Yükleme ve silme yalnızca yöneticiye açıktır. Rapor dosyalarını ve erişim kurallarını eklemek için mevcut Supabase projesinde `supabase/migrations/2026-11-16-private-platform-reports.sql` dosyasını SQL Editor'de bir kez çalıştır; önceki platform/performance migration dosyalarını tekrar çalıştırma.
 
 ## Bu sürümün sınırı
 
-Bu sürüm; kullanıcı adıyla giriş, ilk girişte parola değiştirme, rol bazlı ekranlar, platform listesi, yayıncı ekleme, finans kaydı, haftalık performans girişi ve hesap kapatma akışlarını içerir. Rol bazlı erişim veritabanında da uygulanır. Üretimde kullanmadan önce Supabase projesinde kurulum ve gerçek kullanıcılarla erişim ayrıca doğrulanmalıdır.
+Bu sürüm; kullanıcı adıyla giriş, ilk girişte parola değiştirme, rol bazlı ekranlar, platform listesi, dosya raporu arşivi, finans kaydı, haftalık performans girişi, danışman uygulama ataması ve hesap kapatma akışlarını içerir. Eski yayıncı verileri veritabanında korunur ancak panelde ayrı bir Yayıncılar bölümü gösterilmez. Rol bazlı erişim veritabanında da uygulanır.

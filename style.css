@@ -48,4 +48,11 @@
 }
 
 .brand-mark img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.report-filters{grid-template-columns:repeat(2,minmax(180px,230px));gap:0 10px}
+.report-filters .field{margin:0}
+.platform-checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin:12px 0}
+.platform-check{display:flex;align-items:center;gap:9px;padding:11px;border:1px solid var(--line);border-radius:10px;background:#100e0d;color:var(--text);font-size:12px}
+.platform-check input{width:auto;accent-color:var(--red)}
+input[type=file]{padding:9px;font-size:12px}
+@media(max-width:680px){.report-filters{grid-template-columns:1fr;width:100%}}
 

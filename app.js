@@ -111,7 +111,7 @@ async function loadProfiles() {
 
 function buildNav() {
   const entries = [{heading:'ÇALIŞMA ALANI'},{id:'overview',icon:'▦',name:'Genel Bakış'}];
-  if (['admin','consultant','subagency_owner'].includes(profile.role)) entries.push({id:'creators',icon:'♙',name:'Yayıncılar'});
+  if (['admin','consultant','subagency_owner'].includes(profile.role)) entries.push({id:'reports',icon:'▤',name:'Raporlar'});
   if (['admin','subagency_owner'].includes(profile.role)) entries.push({id:'finance',icon:'₺',name:'Gelir & Gider'});
   entries.push({id:'performance',icon:'↗',name:'Performans'});
   if (profile.role === 'admin') entries.push({id:'users',icon:'♧',name:'Kullanıcı Yönetimi'});
@@ -125,13 +125,13 @@ function buildNav() {
 async function openPage(id) {
   currentPage=id;
   const platform = id.startsWith('platform:') ? platforms.find(p=>p.id===id.split(':')[1]) : null;
-  const title = platform?.name || ({overview:'Genel Bakış',creators:'Yayıncılar',finance:'Gelir & Gider',performance:'Performans',users:'Kullanıcı Yönetimi'}[id] || 'Panel');
+  const title = platform?.name || ({overview:'Genel Bakış',reports:'Raporlar',finance:'Gelir & Gider',performance:'Performans',users:'Kullanıcı Yönetimi'}[id] || 'Panel');
   document.querySelector('#breadcrumb').textContent=title;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
   msg('');
   if (profile.must_change_password) return renderPasswordChange();
   if (id==='overview') return renderOverview();
-  if (id==='creators') return renderCreators();
+  if (id==='reports') return renderReports();
   if (id==='finance') return renderFinance();
   if (id==='performance') return renderPerformance();
   if (id==='users') return renderUsers();
@@ -145,16 +145,16 @@ function platformOptions(selected='',includeAll=false) { return `<option value="
 function roleUsersOptions(selected='') { return `<option value="">Kendime ata</option>${profiles.filter(p=>p.active).map(p=>`<option value="${p.id}" ${p.id===selected?'selected':''}>${esc(p.full_name)} · ${esc(roleName(p.role))}</option>`).join('')}`; }
 async function renderOverview() {
   const count = async tableName => { const {count}=await db.from(tableName).select('id',{count:'exact',head:true}); return count||0; };
-  const [creatorCount,financeResult,performanceResult] = await Promise.all([
-    count('creators'), db.from('financial_entries').select('entry_type,amount,currency'), db.from('performance_entries').select('revenue_contribution,currency')
+  const [reportCount,financeResult,performanceResult] = await Promise.all([
+    count(profile.role==='assistant'?'performance_entries':'platform_reports'), db.from('financial_entries').select('entry_type,amount,currency'), db.from('performance_entries').select('revenue_contribution,currency')
   ]);
   const totals={}; (financeResult.data||[]).forEach(row=>{const c=row.currency||'GBP';totals[c]??={income:0,expense:0};totals[c][row.entry_type]+=Number(row.amount||0)});
   const rev={}; (performanceResult.data||[]).forEach(r=>{const c=r.currency||'GBP';rev[c]=(rev[c]||0)+Number(r.revenue_contribution||0)});
   const financialText=Object.keys(totals).length?Object.entries(totals).map(([c,v])=>`${c}: net ${money(v.income-v.expense,c)}`).join(' · '):'Henüz gelir/gider kaydı yok';
   const revenueText=Object.keys(rev).length?Object.entries(rev).map(([c,v])=>`${c}: ${money(v,c)}`).join(' · '):'Henüz ciro katkısı girilmedi';
-  page.innerHTML=`${titleBlock('Genel Bakış','Yetki alanındaki yayıncı, performans ve finans özetleri.')}
-    <div class="cards">${cardMetric('Yayıncı',creatorCount,'Erişebildiğin profiller')}${cardMetric('Ciro katkısı',revenueText,'Performans kayıtlarından')}${cardMetric('Gelir − gider',financialText,'Yetkine açık kayıtlar')}</div>
-    <div class="columns"><article class="card"><h2>Hızlı bağlantılar</h2><p>İşlem yapmak istediğin bölümü aç.</p><div class="form-actions"><button class="button" data-open="creators">Yayıncılar</button><button class="button" data-open="performance">Performans</button></div></article><article class="card"><h2>Güvenli erişim</h2><p>Bu oturumda yalnızca rolüne ve bağlı olduğun ekibe izin verilen kayıtlar gösterilir.</p><span class="pill">${esc(roleName(profile.role))}</span></article></div>`;
+  page.innerHTML=`${titleBlock('Genel Bakış','Yetki alanındaki dosya raporları, performans ve finans özetleri.')}
+    <div class="cards">${cardMetric(profile.role==='assistant'?'Performans raporların':'Erişebildiğin raporlar',reportCount,profile.role==='assistant'?'Kendi haftalık kayıtların':'Uygulama ve ajans kapsamına göre')}${cardMetric('Ciro katkısı',revenueText,'Yetkili performans raporlarından')}${cardMetric('Gelir − gider',financialText,'Yetkine açık kayıtlar')}</div>
+    <div class="columns"><article class="card"><h2>Hızlı bağlantılar</h2><p>İşlem yapmak istediğin bölümü aç.</p><div class="form-actions">${['admin','consultant','subagency_owner'].includes(profile.role)?'<button class="button" data-open="reports">Raporlar</button>':''}<button class="button" data-open="performance">Performans</button></div></article><article class="card"><h2>Güvenli erişim</h2><p>Bu oturumda yalnızca rolüne ve bağlı olduğun ekibe izin verilen kayıtlar gösterilir.</p><span class="pill">${esc(roleName(profile.role))}</span></article></div>`;
   page.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPage(b.dataset.open)));
 }
 
@@ -171,6 +171,63 @@ async function renderCreators() {
   form.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(form);const input={display_name:f.get('display_name').trim(),phone:f.get('phone')||null,email:f.get('email')||null,platform_id:f.get('platform_id')||null,started_on:f.get('started_on')||null,status:f.get('status'),consultant_id:profile.role==='admin'?records.find(r=>r.id===f.get('record_id'))?.consultant_id||profile.id:profile.id,agency_id:profile.role==='admin'?records.find(r=>r.id===f.get('record_id'))?.agency_id||profile.agency_id:profile.agency_id,notes:f.get('notes')||null,created_by:profile.id};const recordId=f.get('record_id');const query=recordId?db.from('creators').update(input).eq('id',recordId):db.from('creators').insert(input);const {error}=await query;if(error)return msg(error.message,true);msg(recordId?'Yayıncı kaydı güncellendi.':'Yayıncı eklendi.');renderCreators();});
   page.querySelectorAll('[data-edit-creator]').forEach(button=>button.addEventListener('click',()=>{const r=records.find(x=>x.id===button.dataset.editCreator);if(!r)return;form.elements.record_id.value=r.id;form.elements.display_name.value=r.display_name||'';form.elements.phone.value=r.phone||'';form.elements.email.value=r.email||'';form.elements.platform_id.value=r.platform_id||'';form.elements.started_on.value=r.started_on||'';form.elements.status.value=r.status||'active';form.elements.notes.value=r.notes||'';document.querySelector('#creator-form-title').textContent='Yayıncı kaydını düzenle';document.querySelector('#creator-save').textContent='Değişiklikleri kaydet';document.querySelector('#create-box').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}));
   page.querySelectorAll('[data-delete-creator]').forEach(button=>button.addEventListener('click',async()=>{if(!confirm('Bu yayıncı kaydını silmek istiyor musun?'))return;const {error}=await db.from('creators').delete().eq('id',button.dataset.deleteCreator);if(error)return msg(error.message,true);msg('Yayıncı kaydı silindi.');renderCreators();}));
+}
+
+async function renderReports() {
+  if (!['admin','consultant','subagency_owner'].includes(profile.role)) {
+    page.innerHTML=titleBlock('Raporlar','Bu bölüm bu kullanıcı rolüne açık değil.')+`<div class="empty">Kendi haftalık raporlarını Performans bölümünde görebilirsin.</div>`;
+    return;
+  }
+  let agencies=[];
+  if(profile.role==='admin') {
+    const {data,error}=await db.from('agencies').select('id,name').order('name');
+    if(error)return page.innerHTML=titleBlock('Raporlar','Uygulama raporları.')+`<div class="empty">${esc(error.message)}</div>`;
+    agencies=data||[];
+  }
+  const {data,error}=await db.from('platform_reports').select('*,platforms(name),agencies(name)').order('period_start',{ascending:false}).order('created_at',{ascending:false}).limit(500);
+  if(error)return page.innerHTML=titleBlock('Raporlar','Uygulamaya ve döneme göre filtrelenmiş dosya raporları.')+`<div class="empty">${esc(error.message)}<br>Rapor arşivi için Supabase güncellemesi henüz çalıştırılmamış olabilir.</div>`;
+  const rows=data||[];
+  const fileTypes='Excel (.xlsx, .xls, .csv), PDF veya görsel (.jpg, .png, .webp, .gif)';
+  page.innerHTML=`${titleBlock('Raporlar','Dosyaları uygulama, rapor türü, dönem ve ajansa göre görüntüle.',profile.role==='admin'?'<button class="button primary" id="toggle-report-form">＋ Rapor yükle</button>':'')}
+    ${profile.role==='admin'?`<article id="report-form-box" class="card hidden"><h2>Rapor dosyası yükle</h2><p>${fileTypes} · Dosya başına en fazla 20 MB. Raporlar yalnızca yetkili hesaplara gösterilir.</p><form id="report-form" class="form-grid"><label class="field">Başlık<input name="title" maxlength="120" placeholder="Boş bırakılırsa dosya adı kullanılır"></label><label class="field">Uygulama<select name="platform_id" required>${platformOptions()}</select></label><label class="field">Rapor türü<select name="report_type"><option value="daily">Günlük</option><option value="weekly">Haftalık</option></select></label><label class="field">Alt ajans<select name="agency_id"><option value="">Merkez / ajansa özel değil</option>${agencies.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></label><label class="field">Dönem başlangıcı<input name="period_start" type="date" value="${today()}" required></label><label class="field">Dönem bitişi<input name="period_end" type="date" value="${today()}" required></label><label class="field full">Rapor dosyası<input name="file" type="file" accept=".xlsx,.xls,.csv,.pdf,.jpg,.jpeg,.png,.webp,.gif,application/pdf,image/jpeg,image/png,image/webp,image/gif,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></label><label class="field full">Açıklama (isteğe bağlı)<textarea name="notes" rows="2" maxlength="1000" placeholder="Raporla ilgili kısa not"></textarea></label><div class="form-actions full"><button class="button primary" type="submit" id="report-submit">Yükle</button><button class="button" type="button" id="cancel-report">Vazgeç</button></div></form></article>`:''}
+    <div class="section-head"><strong>Rapor arşivi</strong><div class="form-grid report-filters"><label class="field">Uygulama<select id="report-filter-platform"><option value="all">Tüm uygulamalar</option>${platforms.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label><label class="field">Tür<select id="report-filter-type"><option value="all">Günlük ve haftalık</option><option value="daily">Günlük</option><option value="weekly">Haftalık</option></select></label></div></div>
+    <article class="card" id="report-table-card"></article>`;
+
+  const drawRows=()=>{
+    const selectedPlatform=document.querySelector('#report-filter-platform')?.value||'all';
+    const selectedType=document.querySelector('#report-filter-type')?.value||'all';
+    const visible=rows.filter(r=>(selectedPlatform==='all'||r.platform_id===selectedPlatform)&&(selectedType==='all'||r.report_type===selectedType));
+    document.querySelector('#report-table-card').innerHTML=table(['Başlık','Uygulama','Tür','Dönem','Ajans','Dosya','Yüklenme',...(profile.role==='admin'?['İşlem']:[])],visible.map(r=>`<tr><td>${esc(r.title)}</td><td>${esc(r.platforms?.name||'—')}</td><td>${r.report_type==='daily'?'Günlük':'Haftalık'}</td><td>${niceDate(r.period_start)}${r.period_end!==r.period_start?` – ${niceDate(r.period_end)}`:''}</td><td>${esc(r.agencies?.name||'Merkez')}</td><td><button class="button" data-open-report="${r.id}">${esc(r.original_filename)}</button></td><td>${new Date(r.created_at).toLocaleDateString('tr-TR')}</td>${profile.role==='admin'?`<td><button class="button" data-delete-report="${r.id}">Sil</button></td>`:''}</tr>`),'Bu filtrelerde rapor bulunamadı.');
+    document.querySelectorAll('[data-open-report]').forEach(button=>button.addEventListener('click',async()=>{const report=rows.find(r=>r.id===button.dataset.openReport);if(!report)return;const tab=window.open('about:blank','_blank');const {data,error}=await db.storage.from('platform-reports').createSignedUrl(report.storage_path,120);if(error||!data?.signedUrl){tab?.close();return msg(error?.message||'Rapor bağlantısı oluşturulamadı.',true);}if(tab)tab.location.href=data.signedUrl;else window.location.assign(data.signedUrl);}));
+    document.querySelectorAll('[data-delete-report]').forEach(button=>button.addEventListener('click',async()=>{const report=rows.find(r=>r.id===button.dataset.deleteReport);if(!report||!confirm('Bu raporu ve yüklenen dosyasını silmek istiyor musun?'))return;const {error:removeError}=await db.storage.from('platform-reports').remove([report.storage_path]);if(removeError)return msg(removeError.message,true);const {error:deleteError}=await db.from('platform_reports').delete().eq('id',report.id);if(deleteError)return msg(deleteError.message,true);msg('Rapor silindi.');renderReports();}));
+  };
+  document.querySelector('#report-filter-platform').addEventListener('change',drawRows);
+  document.querySelector('#report-filter-type').addEventListener('change',drawRows);
+  drawRows();
+  if(profile.role!=='admin')return;
+  const box=document.querySelector('#report-form-box');
+  document.querySelector('#toggle-report-form').addEventListener('click',()=>box.classList.toggle('hidden'));
+  document.querySelector('#cancel-report').addEventListener('click',()=>{document.querySelector('#report-form').reset();box.classList.add('hidden');});
+  const allowedMime={xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',xls:'application/vnd.ms-excel',csv:'text/csv',pdf:'application/pdf',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif'};
+  document.querySelector('#report-form').addEventListener('submit',async event=>{
+    event.preventDefault();
+    const form=event.currentTarget;const f=new FormData(form);const file=f.get('file');
+    if(!(file instanceof File)||!file.name)return msg('Yüklenecek dosyayı seç.',true);
+    if(file.size>20*1024*1024)return msg('Dosya 20 MB sınırını aşıyor.',true);
+    const ext=file.name.split('.').pop().toLowerCase();const contentType=allowedMime[ext];
+    if(!contentType)return msg('Bu dosya türü desteklenmiyor. Excel, PDF veya görsel dosyası seç.',true);
+    const periodStart=f.get('period_start'),periodEnd=f.get('period_end');
+    if(periodEnd<periodStart)return msg('Dönem bitişi başlangıç tarihinden önce olamaz.',true);
+    if(f.get('report_type')==='daily'&&periodStart!==periodEnd)return msg('Günlük raporda başlangıç ve bitiş tarihi aynı olmalı.',true);
+    const safeName=file.name.normalize('NFKD').replace(/\p{M}/gu,'').replace(/[^A-Za-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(-120)||`rapor.${ext}`;
+    const id=crypto.randomUUID();const storagePath=`${id}/${safeName}`;const saveButton=document.querySelector('#report-submit');saveButton.disabled=true;saveButton.textContent='Yükleniyor…';
+    const metadata={id,title:String(f.get('title')||'').trim()||file.name,platform_id:f.get('platform_id'),report_type:f.get('report_type'),period_start:periodStart,period_end:periodEnd,agency_id:f.get('agency_id')||null,original_filename:file.name,storage_path:storagePath,content_type:contentType,file_size:file.size,uploaded_by:profile.id};
+    const {error:insertError}=await db.from('platform_reports').insert(metadata);
+    if(insertError){saveButton.disabled=false;saveButton.textContent='Yükle';return msg(insertError.message,true);}
+    const {error:uploadError}=await db.storage.from('platform-reports').upload(storagePath,file,{contentType,upsert:false});
+    if(uploadError){await db.from('platform_reports').delete().eq('id',id);saveButton.disabled=false;saveButton.textContent='Yükle';return msg(uploadError.message,true);}
+    msg('Rapor dosyası yüklendi.');await renderReports();
+  });
 }
 
 async function renderFinance() {
@@ -248,27 +305,36 @@ async function renderPerformance() {
 
 async function renderUsers() {
   await loadProfiles();
-  const rows=profiles.map(p=>`<tr><td>${esc(p.full_name)}</td><td>${esc(p.username)}</td><td>${esc(p.email)}</td><td>${esc(p.phone||'—')}</td><td>${esc(roleName(p.role))}</td><td><span class="pill ${p.active?'':'review'}">${p.active?'Aktif':'Kapalı'}</span></td><td>${p.id!==profile.id?`${p.active?`<button class="button" data-disable="${p.id}">Kapat</button>`:`<button class="button" data-activate="${p.id}">Aç</button>`} <button class="button" data-reset="${p.id}">Parola yenile</button>`:'—'}</td></tr>`);
+  const {data:assignmentRows,error:assignmentError}=await db.from('consultant_platforms').select('user_id,platform_id');
+  if(assignmentError)return page.innerHTML=titleBlock('Kullanıcı Yönetimi','Çalışan ve alt ajans hesaplarını yönet.')+`<div class="empty">${esc(assignmentError.message)}<br>Önce Raporlar güncellemesinin SQL dosyasını çalıştır.</div>`;
+  const assignmentMap=new Map();(assignmentRows||[]).forEach(r=>{if(!assignmentMap.has(r.user_id))assignmentMap.set(r.user_id,[]);assignmentMap.get(r.user_id).push(r.platform_id);});
+  const rows=profiles.map(p=>`<tr><td>${esc(p.full_name)}</td><td>${esc(p.username)}</td><td>${esc(p.email)}</td><td>${esc(p.phone||'—')}</td><td>${esc(roleName(p.role))}</td><td><span class="pill ${p.active?'':'review'}">${p.active?'Aktif':'Kapalı'}</span></td><td>${p.role==='consultant'?`<button class="button" data-assign-platforms="${p.id}">Uygulamaları ata</button> `:''}${p.id!==profile.id?`${p.active?`<button class="button" data-disable="${p.id}">Kapat</button>`:`<button class="button" data-activate="${p.id}">Aç</button>`} <button class="button" data-reset="${p.id}">Parola yenile</button>`:'—'}</td></tr>`);
   page.innerHTML=`${titleBlock('Kullanıcı Yönetimi','Çalışan ve alt ajans hesaplarını yalnızca sen yönetebilirsin.','<button class="button primary" id="toggle-form">＋ Kullanıcı oluştur</button>')}
+    <article id="assignment-box" class="card hidden"><h2 id="assignment-title">Danışman uygulama yetkileri</h2><p>Danışmanlar yalnızca seçilen uygulamalara ait yüklenmiş raporları görebilir.</p><div id="assigned-platforms" class="platform-checks"></div><div class="form-actions"><button class="button primary" id="save-platform-assignment">Yetkileri kaydet</button><button class="button" type="button" id="cancel-platform-assignment">Vazgeç</button></div></article>
     <article id="create-box" class="card hidden"><h2>Yeni hesap</h2><p>Geçici parolayı güvenli biçimde çalışana ilet. İlk girişte parola değişimi zorunlu olur.</p><form id="user-form" class="form-grid"><label class="field">Ad soyad<input name="full_name" required></label><label class="field">Telefon<input name="phone" type="tel"></label><label class="field">E-posta<input name="email" type="email" required></label><label class="field">Kullanıcı adı<input name="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]+"></label><label class="field">Rol<select name="role"><option value="assistant">Asistan / Kayıtçı</option><option value="consultant">Danışman</option><option value="subagency_owner">Alt ajans sahibi</option></select></label><label id="agency-field" class="field hidden">Ajans adı<input name="agency_name"></label><label class="field full">İlk giriş parolası<input name="password" type="password" minlength="12" autocomplete="new-password" required><small class="small">En az 12 karakter. İlk girişte değiştirilmesi istenir.</small></label><div class="form-actions full"><button class="button primary">Hesap oluştur</button><button class="button" type="button" id="cancel-form">Vazgeç</button></div></form></article>
     <article class="card">${table(['Ad soyad','Kullanıcı adı','E-posta','Telefon','Rol','Hesap','İşlem'],rows,'Henüz personel hesabı yok.')}</article>`;
   wireFormToggle();
   const roleSelect=document.querySelector('#user-form [name="role"]');
   roleSelect.addEventListener('change',()=>document.querySelector('#agency-field').classList.toggle('hidden',roleSelect.value!=='subagency_owner'));
   document.querySelector('#user-form').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const payload={action:'create',full_name:f.get('full_name'),phone:f.get('phone'),email:f.get('email'),username:f.get('username'),password:f.get('password'),role:f.get('role'),agency_name:f.get('agency_name')};const result=await invoke('manage-users',payload);if(!result.ok)return msg(result.error||'Hesap açılamadı.',true);msg(`Hesap oluşturuldu. Kullanıcı adı: ${result.username}`);await renderUsers();});
+  let assignmentUserId='';
+  page.querySelectorAll('[data-assign-platforms]').forEach(button=>button.addEventListener('click',()=>{assignmentUserId=button.dataset.assignPlatforms;const person=profiles.find(p=>p.id===assignmentUserId);document.querySelector('#assignment-title').textContent=`${person?.full_name||'Danışman'} · Uygulama yetkileri`;const assigned=new Set(assignmentMap.get(assignmentUserId)||[]);document.querySelector('#assigned-platforms').innerHTML=platforms.map(p=>`<label class="platform-check"><input type="checkbox" value="${p.id}" ${assigned.has(p.id)?'checked':''}><span>${esc(p.name)}</span></label>`).join('')||'<div class="empty">Uygulama bulunamadı.</div>';document.querySelector('#assignment-box').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}));
+  document.querySelector('#cancel-platform-assignment').addEventListener('click',()=>document.querySelector('#assignment-box').classList.add('hidden'));
+  document.querySelector('#save-platform-assignment').addEventListener('click',async event=>{if(!assignmentUserId)return;const button=event.currentTarget;button.disabled=true;const selected=[...document.querySelectorAll('#assigned-platforms input:checked')].map(x=>x.value);const current=assignmentMap.get(assignmentUserId)||[];const added=selected.filter(id=>!current.includes(id));const removed=current.filter(id=>!selected.includes(id));if(added.length){const {error}=await db.from('consultant_platforms').insert(added.map(platform_id=>({user_id:assignmentUserId,platform_id,assigned_by:profile.id})));if(error){button.disabled=false;return msg(error.message,true);}}if(removed.length){const {error}=await db.from('consultant_platforms').delete().eq('user_id',assignmentUserId).in('platform_id',removed);if(error){button.disabled=false;return msg(error.message,true);}}msg('Danışmanın uygulama yetkileri güncellendi.');await renderUsers();});
   page.querySelectorAll('[data-disable]').forEach(button=>button.addEventListener('click',async()=>{if(!confirm('Bu kişinin panel erişimini kapatmak istiyor musun?'))return;const result=await invoke('manage-users',{action:'deactivate',user_id:button.dataset.disable});if(!result.ok)return msg(result.error||'Erişim kapatılamadı.',true);msg('Hesap erişimi kapatıldı.');renderUsers();}));
   page.querySelectorAll('[data-activate]').forEach(button=>button.addEventListener('click',async()=>{if(!confirm('Bu kişinin panel erişimini yeniden açmak istiyor musun?'))return;const result=await invoke('manage-users',{action:'activate',user_id:button.dataset.activate});if(!result.ok)return msg(result.error||'Hesap açılamadı.',true);msg('Hesap yeniden açıldı.');renderUsers();}));
   page.querySelectorAll('[data-reset]').forEach(button=>button.addEventListener('click',async()=>{const password=prompt('En az 12 karakterlik yeni geçici parolayı gir:');if(!password)return;if(password.length<12)return msg('Parola en az 12 karakter olmalı.',true);const result=await invoke('manage-users',{action:'reset_password',user_id:button.dataset.reset,password});if(!result.ok)return msg(result.error||'Parola değiştirilemedi.',true);msg('Parola yenilendi. Yeni geçici parolayı personele güvenli yoldan ilet.');}));
 }
 
 async function renderPlatform(platform) {
-  const [{data:creators},{data:perf}] = await Promise.all([
-    db.from('creators').select('id,status').eq('platform_id',platform.id),
+  const [{data:reports},{data:perf}] = await Promise.all([
+    db.from('platform_reports').select('id').eq('platform_id',platform.id),
     db.from('performance_entries').select('revenue_contribution,currency').eq('platform_id',platform.id),
   ]);
   const revenue={};(perf||[]).forEach(p=>revenue[p.currency]=(revenue[p.currency]||0)+Number(p.revenue_contribution));
   const revenueLabel=Object.keys(revenue).length?Object.entries(revenue).map(([c,v])=>`${c}: ${money(v,c)}`).join(' · '):'Henüz ciro katkısı yok';
-  page.innerHTML=`${titleBlock(platform.name,'Bu uygulamadaki yayıncı ve performans özeti.')}<div class="cards">${cardMetric('Uygulama durumu',statusName(platform.status),'Yönetici tarafından yönetilir')}${cardMetric('Yayıncı',(creators||[]).length,'Erişim alanındaki profiller')}${cardMetric('Ciro katkısı',revenueLabel,'Performans kayıtlarından')}</div><article class="card"><h2>Uygulama kayıtları</h2><p>Yayıncı ve performans bilgilerini ilgili menülerden bu uygulamaya göre takip edebilirsin.</p></article>`;
+  page.innerHTML=`${titleBlock(platform.name,'Bu uygulamanın erişebildiğin rapor ve performans özeti.')}<div class="cards">${cardMetric('Uygulama durumu',statusName(platform.status),'Yönetici tarafından yönetilir')}${cardMetric('Erişebildiğin raporlar',(reports||[]).length,'Raporlar bölümünde görüntülenir')}${cardMetric('Ciro katkısı',revenueLabel,'Yetkili performans kayıtlarından')}</div><article class="card"><h2>Uygulama raporları</h2><p>Günlük ve haftalık dosyaları Raporlar bölümünden uygulamaya göre filtreleyebilirsin.</p><button class="button" data-open="reports">Raporlar bölümüne git</button></article>`;
+  page.querySelector('[data-open="reports"]')?.addEventListener('click',()=>openPage('reports'));
 }
 
 function wireFormToggle() {
