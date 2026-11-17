@@ -117,6 +117,7 @@ function buildNav() {
   else if (['assistant','consultant'].includes(profile.role)) entries.push({id:'my-payments',icon:'✓',name:'Ödeme Durumum'});
   if (['admin','subagency_owner'].includes(profile.role)) entries.push({id:'finance',icon:'₺',name:'Gelir & Gider'});
   entries.push({id:'performance',icon:'↗',name:'Performans'});
+  if (['admin','assistant','consultant'].includes(profile.role)) entries.push({id:'referrals',icon:'↗',name:'Referans Kayıtları'});
   if (profile.role === 'admin') entries.push({id:'users',icon:'♧',name:'Kullanıcı Yönetimi'});
   entries.push({heading:'UYGULAMALAR'});
   platforms.forEach(p=>entries.push({id:`platform:${p.id}`,icon:p.name.slice(0,1).toUpperCase(),name:p.name,status:p.status}));
@@ -128,7 +129,7 @@ function buildNav() {
 async function openPage(id) {
   currentPage=id;
   const platform = id.startsWith('platform:') ? platforms.find(p=>p.id===id.split(':')[1]) : null;
-  const title = platform?.name || ({overview:'Genel Bakış',reports:'Raporlar',payments:'Çalışan Ödeme Tablosu','my-payments':'Ödeme Durumum',finance:'Gelir & Gider',performance:'Performans',users:'Kullanıcı Yönetimi'}[id] || 'Panel');
+  const title = platform?.name || ({overview:'Genel Bakış',reports:'Raporlar',payments:'Çalışan Ödeme Tablosu','my-payments':'Ödeme Durumum',finance:'Gelir & Gider',performance:'Performans',referrals:'Referans Kayıtları',users:'Kullanıcı Yönetimi'}[id] || 'Panel');
   document.querySelector('#breadcrumb').textContent=title;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
   msg('');
@@ -139,6 +140,7 @@ async function openPage(id) {
   if (id==='my-payments') return renderMyPaymentStatus();
   if (id==='finance') return renderFinance();
   if (id==='performance') return renderPerformance();
+  if (id==='referrals') return renderReferrals();
   if (id==='users') return renderUsers();
   if (platform) return renderPlatform(platform);
 }
@@ -379,6 +381,44 @@ async function renderPerformance() {
   form.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(form);const kind=editingReportType||(profile.role==='admin'?f.get('report_type'):initialType);const selectedUser=profile.role==='admin'?profiles.find(p=>p.id===f.get('user_id')):profile;if(!selectedUser)return msg('Önce kişiyi seç.',true);if(f.get('period_end')<f.get('period_start'))return msg('Hafta bitişi başlangıç tarihinden önce olamaz.',true);
     const input={user_id:selectedUser.id,agency_id:selectedUser.agency_id||null,platform_id:f.get('platform_id')&&f.get('platform_id')!=='all'?f.get('platform_id'):null,period_start:f.get('period_start'),period_end:f.get('period_end'),report_type:kind,phone_numbers_count:kind==='assistant'?Number(f.get('phone_numbers_count')||0):0,applications_count:0,registrations_count:kind==='assistant'?Number(f.get('registrations_count')||0):0,active_creators_count:0,quota_completed:kind==='consultant'?Number(f.get('quota_completed')||0):0,background_quota:kind==='consultant'?Number(f.get('background_quota')||0):0,weekly_issues:kind==='consultant'?(f.get('weekly_issues')||null):null,solution_suggestions:kind==='consultant'?(f.get('solution_suggestions')||null):null,revenue_contribution:profile.role==='admin'?Number(f.get('revenue_contribution')||0):0,currency:profile.role==='admin'?f.get('currency'):'GBP',note:null,entered_by:profile.id};
     const query=editingRecordId?db.from('performance_entries').update(input).eq('id',editingRecordId):db.from('performance_entries').insert(input);const {error}=await query;if(error)return msg(error.message,true);msg(editingRecordId?'Performans raporu güncellendi.':'Haftalık rapor kaydedildi.');renderPerformance();});
+}
+
+async function renderReferrals(filters={}) {
+  if(profile.role==='admin')await loadProfiles();
+  const canManage=profile.role==='admin'||profile.role==='assistant';
+  const week=weekDates();
+  let allowedPlatforms=platforms.filter(p=>p.status==='active');
+  if(profile.role==='consultant') {
+    const {data:assignments,error:assignmentError}=await db.from('consultant_platforms').select('platform_id').eq('user_id',profile.id);
+    if(assignmentError)return page.innerHTML=titleBlock('Referans Kayıtları','Yetkili olduğun uygulamaların referansları.')+`<div class="empty">${esc(assignmentError.message)}</div>`;
+    const assigned=new Set((assignments||[]).map(r=>r.platform_id));
+    allowedPlatforms=platforms.filter(p=>assigned.has(p.id));
+  }
+  const start=filters.start||week.start,end=filters.end||week.end;
+  const selectedPlatform=filters.platform||'all';
+  const platformFilter=profile.role==='consultant'
+    ? `<option value="all">Tüm yetkili uygulamalar</option>${allowedPlatforms.map(p=>`<option value="${p.id}" ${selectedPlatform===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}`
+    : `<option value="all">Tüm uygulamalar</option>${allowedPlatforms.map(p=>`<option value="${p.id}" ${selectedPlatform===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}`;
+  let query=db.from('referral_entries').select('*,platforms(name)').gte('period_start',start).lte('period_end',end).order('period_start',{ascending:false}).order('created_at',{ascending:false}).limit(1000);
+  if(selectedPlatform!=='all')query=query.eq('platform_id',selectedPlatform);
+  const {data,error}=await query;
+  if(error)return page.innerHTML=titleBlock('Referans Kayıtları','Haftalık referansları uygulamaya ve döneme göre incele.')+`<div class="empty">${esc(error.message)}<br>Referans kayıtları SQL güncellemesi henüz çalıştırılmamış olabilir.</div>`;
+  const records=data||[];
+  const canEditRecord=r=>profile.role==='admin'||(profile.role==='assistant'&&r.submitted_by===profile.id);
+  const tableRows=records.map(r=>{const actions=`${canEditRecord(r)?`<button class="button" data-edit-referral="${r.id}">Düzenle</button>`:''}${profile.role==='admin'?` <button class="button" data-delete-referral="${r.id}">Sil</button>`:''}`;return `<tr><td>${esc(r.platforms?.name||'—')}</td><td>${niceDate(r.period_start)} – ${niceDate(r.period_end)}</td><td>${esc(r.referred_creator_id)}</td><td>${esc(r.referred_creator_phone)}</td><td>${esc(r.referrer_name)}</td><td>${esc(r.referrer_phone)}</td>${profile.role==='admin'?`<td>${esc(profiles.find(p=>p.id===r.submitted_by)?.display_name||profiles.find(p=>p.id===r.submitted_by)?.full_name||'—')}</td>`:''}<td>${actions||'—'}</td></tr>`;});
+  const startValue=esc(start),endValue=esc(end),editingAllowed=canManage;
+  page.innerHTML=`${titleBlock('Referans Kayıtları','Haftalık referans kayıtlarını uygulamaya göre gir ve filtrele.',editingAllowed?'<button class="button primary" id="toggle-referral-form">＋ Referans kaydı ekle</button>':'')}
+    <article class="card"><div class="form-grid referral-filters"><label class="field">Uygulama<select id="referral-filter-platform">${platformFilter}</select></label><label class="field">Hafta başlangıcı<input id="referral-filter-start" type="date" value="${startValue}"></label><label class="field">Hafta bitişi<input id="referral-filter-end" type="date" value="${endValue}"></label><div class="form-actions"><button class="button primary" id="apply-referral-filters">Filtrele</button><span class="pill">${records.length} kayıt</span></div></div></article>
+    ${editingAllowed?`<article id="referral-form-card" class="card hidden"><h2 id="referral-form-title">Referans kaydı ekle</h2><p>Üstte referansla gelen yayıncının bilgilerini, altta onu yönlendiren kişinin bilgilerini gir.</p><form id="referral-form" class="form-grid"><input type="hidden" name="record_id"><label class="field">Uygulama<select name="platform_id" required>${allowedPlatforms.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label><label class="field">Hafta başlangıcı<input name="period_start" type="date" value="${week.start}" required></label><label class="field">Hafta bitişi<input name="period_end" type="date" value="${week.end}" required></label><label class="field">Referansla gelen yayıncının ID’si<input name="referred_creator_id" required maxlength="80"></label><label class="field">Referansla gelen yayıncının iletişim telefonu<input name="referred_creator_phone" type="tel" required maxlength="80"></label><label class="field">Referans olan kişinin adı<input name="referrer_name" required maxlength="160"></label><label class="field">Referans olan kişinin telefonu<input name="referrer_phone" type="tel" required maxlength="80"></label><div class="form-actions full"><button class="button primary" id="referral-save">Kaydet</button><button class="button" type="button" id="cancel-referral">Vazgeç</button></div></form></article>`:''}
+    <article class="card">${table(['Uygulama','Hafta','Referansla gelen yayıncı ID','Yayıncı iletişim telefonu','Referans olan kişinin adı','Referans olan kişinin telefonu',...(profile.role==='admin'?['Kaydı giren']:[]),'İşlem'],tableRows,'Bu hafta ve uygulama filtresinde referans kaydı yok.')}</article>`;
+  document.querySelector('#apply-referral-filters').addEventListener('click',()=>renderReferrals({start:document.querySelector('#referral-filter-start').value,end:document.querySelector('#referral-filter-end').value,platform:document.querySelector('#referral-filter-platform').value}));
+  if(!editingAllowed)return;
+  const form=document.querySelector('#referral-form');
+  document.querySelector('#toggle-referral-form').addEventListener('click',()=>{form.reset();form.elements.record_id.value='';form.elements.period_start.value=week.start;form.elements.period_end.value=week.end;document.querySelector('#referral-form-title').textContent='Referans kaydı ekle';document.querySelector('#referral-save').textContent='Kaydet';document.querySelector('#referral-form-card').classList.toggle('hidden');});
+  document.querySelector('#cancel-referral').addEventListener('click',()=>{form.reset();form.elements.record_id.value='';document.querySelector('#referral-form-title').textContent='Referans kaydı ekle';document.querySelector('#referral-save').textContent='Kaydet';document.querySelector('#referral-form-card').classList.add('hidden');});
+  form.addEventListener('submit',async event=>{event.preventDefault();const f=new FormData(form);if(f.get('period_end')<f.get('period_start'))return msg('Hafta bitişi başlangıç tarihinden önce olamaz.',true);const recordId=f.get('record_id');const payload={platform_id:f.get('platform_id'),period_start:f.get('period_start'),period_end:f.get('period_end'),referred_creator_id:String(f.get('referred_creator_id')).trim(),referred_creator_phone:String(f.get('referred_creator_phone')).trim(),referrer_name:String(f.get('referrer_name')).trim(),referrer_phone:String(f.get('referrer_phone')).trim(),submitted_by:recordId?records.find(r=>r.id===recordId)?.submitted_by||profile.id:profile.id,updated_at:new Date().toISOString()};const result=recordId?await db.from('referral_entries').update(payload).eq('id',recordId):await db.from('referral_entries').insert(payload);if(result.error)return msg(result.error.message,true);msg(recordId?'Referans kaydı güncellendi.':'Referans kaydı eklendi.');await renderReferrals({start:document.querySelector('#referral-filter-start').value,end:document.querySelector('#referral-filter-end').value,platform:document.querySelector('#referral-filter-platform').value});});
+  page.querySelectorAll('[data-edit-referral]').forEach(button=>button.addEventListener('click',()=>{const record=records.find(r=>r.id===button.dataset.editReferral);if(!record)return;for(const key of ['record_id','platform_id','period_start','period_end','referred_creator_id','referred_creator_phone','referrer_name','referrer_phone'])form.elements[key].value=key==='record_id'?record.id:record[key]||'';document.querySelector('#referral-form-title').textContent='Referans kaydını düzenle';document.querySelector('#referral-save').textContent='Değişiklikleri kaydet';document.querySelector('#referral-form-card').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}));
+  page.querySelectorAll('[data-delete-referral]').forEach(button=>button.addEventListener('click',async()=>{if(!confirm('Bu referans kaydını silmek istiyor musun?'))return;const {error:deleteError}=await db.from('referral_entries').delete().eq('id',button.dataset.deleteReferral);if(deleteError)return msg(deleteError.message,true);msg('Referans kaydı silindi.');await renderReferrals({start:document.querySelector('#referral-filter-start').value,end:document.querySelector('#referral-filter-end').value,platform:document.querySelector('#referral-filter-platform').value});}));
 }
 
 async function renderUsers() {

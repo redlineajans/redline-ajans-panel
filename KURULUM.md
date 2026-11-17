@@ -13,6 +13,7 @@ Bu klasör, gerçek giriş ve kayıt sistemi için başlangıç paketidir. Aray�
 - `supabase/migrations/2026-11-16-employee-payment-table.sql`: yöneticiye özel çalışan ödeme tablosu ile personele yalnızca kendi ödeme durumunu gösteren güvenli işlevi ekler.
 - `supabase/migrations/2026-11-16-employee-assistant-payment-group.sql`: kayıt asistanlarını tüm uygulamalardan bağımsız gruba alır; bu ödemelerin giderlerini genel kayıt olarak işler.
 - `supabase/migrations/2026-11-17-profile-display-names.sql`: gerçek ad-soyaddan ayrı, yönetici tarafından düzenlenen panel görünen adlarını ekler.
+- `supabase/migrations/2026-11-17-weekly-referral-entries.sql`: uygulama ve haftaya bağlı referans kayıtlarını, danışman uygulama yetkisine göre korunan erişim kurallarıyla ekler.
 - `supabase/functions/`: kullanıcı adıyla giriş, yönetici hesabı açma/kapatma ve ilk giriş parolası yenileme işlevleri.
 
 ## Kurulum sırası
@@ -94,6 +95,12 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 - Kullanıcı Yönetimi tablosunda **Görünen adı düzenle** seçeneğiyle çalışan için panelde kullanılacak adı belirleyebilirsin. Rol (ör. Danışman) ayrı gösterilir; görünen ada yalnızca kişinin kullanacağı adı yazmak yeterlidir. Görünen adı boş bırakırsan gerçek ad-soyad varsayılan olarak kullanılır.
 - Bu ad sol alttaki hesap alanında, kullanıcı listelerinde ve performans kayıtlarında görünür. Gerçek `Ad soyad` profilde değiştirilmez.
 - Var olan Supabase projesinde `supabase/migrations/2026-11-17-profile-display-names.sql` dosyasını SQL Editor'de bir kez çalıştır, sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükleyip commit et.
+
+## Haftalık referans kayıtları
+
+- **Referans Kayıtları** bölümü yönetici, asistan/kayıtçı ve danışman hesaplarında görünür. Asistanlar uygulama ve hafta seçip kayıt ekleyebilir; kendi girdiklerini düzenleyebilir. Danışmanlar yalnızca Kullanıcı Yönetimi'nde kendilerine atanmış uygulamaların kayıtlarını görür. Yönetici tüm uygulamaları görür, düzenler ve siler; çalışanlar kayıt silemez.
+- Her satırda hafta, uygulama, referansla gelen yayıncının ID ve telefonu, onu referans eden kişinin adı ve telefonu tutulur. Uygulama seçimi, “Lu200” gibi uygulama etiketini ayrıca yazma ihtiyacını kaldırır.
+- Var olan Supabase projesinde `supabase/migrations/2026-11-17-weekly-referral-entries.sql` dosyasını SQL Editor'de bir kez çalıştır; sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükleyip commit et.
 
 ## Bu sürümün sınırı
 
