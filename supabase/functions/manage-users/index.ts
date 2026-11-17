@@ -5,7 +5,7 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
-const roles = new Set(['assistant', 'consultant', 'subagency_owner']);
+const roles = new Set(['assistant', 'consultant', 'host', 'subagency_owner']);
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });

@@ -14,6 +14,7 @@ Bu klasör, gerçek giriş ve kayıt sistemi için başlangıç paketidir. Aray�
 - `supabase/migrations/2026-11-16-employee-assistant-payment-group.sql`: kayıt asistanlarını tüm uygulamalardan bağımsız gruba alır; bu ödemelerin giderlerini genel kayıt olarak işler.
 - `supabase/migrations/2026-11-17-profile-display-names.sql`: gerçek ad-soyaddan ayrı, yönetici tarafından düzenlenen panel görünen adlarını ekler.
 - `supabase/migrations/2026-11-17-weekly-referral-entries.sql`: uygulama ve haftaya bağlı referans kayıtlarını, danışman uygulama yetkisine göre korunan erişim kurallarıyla ekler.
+- `supabase/migrations/2026-11-17-pk-host-tracking.sql`: Sunucu rolü, özel PK afiş alanı ve uygulama yetkisine göre PK takibini ekler.
 - `supabase/functions/`: kullanıcı adıyla giriş, yönetici hesabı açma/kapatma ve ilk giriş parolası yenileme işlevleri.
 
 ## Kurulum sırası
@@ -86,6 +87,7 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 - Kayıt asistanları **Kayıt Asistanları · Tüm uygulamalar** grubunda ayrı görünür. Bu gruptaki ödemeler belirli bir platforma bağlanmadan **Hepsi / Genel kayıt** gideri olarak işlenir. Diğer çalışanları uygulama grubuna eklemeye devam et.
 - Kayıt asistanı için **Ödeme ekle** seçildiğinde, seçilen hafta aralığındaki kendi haftalık performans raporlarının kayıt sayısı toplanır ve prim otomatik hesaplanır: 1–50 kayıt için tüm kayıt başına 25 TL, 51–100 için 30 TL, 101 ve üstü için 35 TL. Seçilen basamağın ücreti o haftanın bütün kayıtlarına uygulanır. Hesaplanan tutar ödenecek tutara ve tam ödeme varsayılanına gelir; kısmi ödeme için ödenen tutarı değiştirebilirsin. Bu hesap için kayıt asistanının ödeme kaydı panel hesabıyla eşleştirilmiş ve haftalık performans raporu girilmiş olmalı.
 - Bir çalışanı panel hesabıyla eşleştirirsen o hesapta **Ödeme Durumum** menüsü çıkar. Çalışan yalnızca kendisine bağlı haftalık/aylık dönemin başlangıç-bitişini ve “Ödendi / Ödenmedi” durumunu görür; tutarları, ödeme geçmişini, IBAN/TRC20'yi ve borç notunu göremez. Eşleştirme yapılmayan çalışana ödeme durumu gösterilmez.
+- Sunucu hesapları da çalışan ödeme tablosunda ilgili uygulama ve panel hesabıyla eşleştirilebilir; sunucu kendi ödeme durumunu görür, özel ücret ve ödeme bilgilerini göremez.
 - Yönetici **Ödeme ekle** ile ödeme türü, dönem, ödenecek tutar, şimdi ödenen tutar ve tarihi girer. Ödeme otomatik olarak uygulamaya bağlı gider olarak eklenir. Kısmi ödeme girilirse kalan tutar beklemede kalır ve aynı döneme ek ödeme girilebilir.
 - Ödeme düzeltme/silme yalnızca yönetici ödeme geçmişinden yapılır; bağlı gider kaydı da birlikte silinir. Gelir & Gider ekranında çalışan ödeme giderleri salt görüntülenir.
 - Daha önce çalışan ödeme tablosu SQL'ini çalıştırdıysan yalnızca yeni `supabase/migrations/2026-11-16-employee-assistant-payment-group.sql` dosyasını Supabase SQL Editor'de bir kez çalıştır. İlk ödeme tablosu SQL'ini henüz çalıştırmadıysan önce `supabase/migrations/2026-11-16-employee-payment-table.sql`, ardından bu yeni dosyayı çalıştır. Sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükleyip commit et. Çalışan hesabı varsa, ödeme tablosundaki çalışan kaydını o hesapla eşleştir.
@@ -102,6 +104,13 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 - Her satırda hafta, uygulama, referansla gelen yayıncının ID ve telefonu, onu referans eden kişinin adı ve telefonu tutulur. Uygulama seçimi, “Lu200” gibi uygulama etiketini ayrıca yazma ihtiyacını kaldırır.
 - Var olan Supabase projesinde `supabase/migrations/2026-11-17-weekly-referral-entries.sql` dosyasını SQL Editor'de bir kez çalıştır; sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükleyip commit et.
 
+## Sunucular ve PK Takip
+
+- Kullanıcı Yönetimi'nde hesabı **Sunucu** rolüyle oluştur. Sunucuyu **Çalışan Ödeme Tablosu**nda ilgili uygulama grubuna ekle ve panel hesabıyla eşleştir. Böylece Sunucu hesabı yalnızca kendi PK programlarını ve eşleştirilen ödeme durumunu görür.
+- Yönetici ve danışmanlar PK adı, uygulama, tarih-saat, bir veya birden fazla sunucu, afiş, isteğe bağlı EVT takip kodu ve onay durumunu ekleyip düzenleyebilir. Danışman sadece kendisine atanmış uygulamaların PK kayıtlarını yönetir. Afiş onayını dış portaldan kontrol ettikten sonra panelde elle güncelle; panel dış portala bağlanmaz. Sunucular kayıt ekleyemez ve silemez.
+- Afişler `pk-posters` adlı özel Storage alanında saklanır ve yalnızca ilgili PK kaydına yetkili hesaplarca görüntülenebilir. Afiş dosyası 20 MB'ı geçmemelidir.
+- Var olan Supabase projesinde `supabase/migrations/2026-11-17-pk-host-tracking.sql` dosyasını SQL Editor'de bir kez çalıştır. Sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükle. Yeni **Sunucu** hesapları açabilmek için paketteki `supabase/functions/manage-users/index.ts` dosyasını Supabase Edge Functions'taki `manage-users` işlevine yükleyip yeniden dağıt.
+
 ## Bu sürümün sınırı
 
-Bu sürüm; kullanıcı adıyla giriş, ilk girişte parola değiştirme, rol bazlı ekranlar, platform listesi, dosya raporu arşivi, çalışan ödeme tablosu, otomatik gider kaydı, finans kaydı, haftalık performans girişi, danışman uygulama ataması ve hesap kapatma akışlarını içerir. Eski yayıncı verileri veritabanında korunur ancak panelde ayrı bir Yayıncılar bölümü gösterilmez. Rol bazlı erişim veritabanında da uygulanır.
+Bu sürüm; kullanıcı adıyla giriş, ilk girişte parola değiştirme, rol bazlı ekranlar, platform listesi, dosya raporu arşivi, çalışan ödeme tablosu, otomatik gider kaydı, finans kaydı, haftalık performans girişi, haftalık referans kayıtları, sunucu PK takibi, danışman uygulama ataması ve hesap kapatma akışlarını içerir. Eski yayıncı verileri veritabanında korunur ancak panelde ayrı bir Yayıncılar bölümü gösterilmez. Rol bazlı erişim veritabanında da uygulanır.
