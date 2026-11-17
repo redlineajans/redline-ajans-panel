@@ -48,13 +48,24 @@ function parseLocalizedAmount(value) {
   return Number.isFinite(amount)?amount:NaN;
 }
 function niceDate(value) { return value ? new Date(`${value}T00:00:00`).toLocaleDateString('tr-TR') : '—'; }
-function today() { return new Date().toISOString().slice(0, 10); }
+function dateInputValue(date) {
+  const year=date.getFullYear(),month=String(date.getMonth()+1).padStart(2,'0'),day=String(date.getDate()).padStart(2,'0');
+  return `${year}-${month}-${day}`;
+}
+function shiftedLocalDate(days) { const date=new Date();date.setDate(date.getDate()+days);return dateInputValue(date); }
+function isMondayToSunday(start,end) {
+  if(!start||!end)return false;
+  const [sy,sm,sd]=start.split('-').map(Number),[ey,em,ed]=end.split('-').map(Number);
+  const startUtc=Date.UTC(sy,sm-1,sd),endUtc=Date.UTC(ey,em-1,ed);
+  return new Date(startUtc).getUTCDay()===1&&new Date(endUtc).getUTCDay()===0&&endUtc-startUtc===6*86400000;
+}
+function today() { return dateInputValue(new Date()); }
 function weekDates() {
   const d = new Date(); d.setHours(0,0,0,0);
   const day = (d.getDay() + 6) % 7;
   const monday = new Date(d); monday.setDate(d.getDate() - day);
   const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-  return { start:monday.toISOString().slice(0,10), end:sunday.toISOString().slice(0,10) };
+  return { start:dateInputValue(monday), end:dateInputValue(sunday) };
 }
 function roleName(role) { return ({admin:'Yönetici',assistant:'Asistan / Kayıtçı',consultant:'Danışman',subagency_owner:'Alt ajans sahibi',host:'Sunucu'})[role] || role; }
 function visibleName(person) { return person?.display_name?.trim() || person?.full_name || '—'; }
@@ -230,6 +241,7 @@ async function renderReports() {
     const periodStart=f.get('period_start'),periodEnd=f.get('period_end');
     if(periodEnd<periodStart)return msg('Dönem bitişi başlangıç tarihinden önce olamaz.',true);
     if(f.get('report_type')==='daily'&&periodStart!==periodEnd)return msg('Günlük raporda başlangıç ve bitiş tarihi aynı olmalı.',true);
+    if(f.get('report_type')==='weekly'&&!isMondayToSunday(periodStart,periodEnd))return msg('Haftalık rapor pazartesi başlamalı ve pazar bitmeli.',true);
     const safeName=file.name.normalize('NFKD').replace(/\p{M}/gu,'').replace(/[^A-Za-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(-120)||`rapor.${ext}`;
     const id=crypto.randomUUID();const storagePath=`${id}/${safeName}`;const saveButton=document.querySelector('#report-submit');saveButton.disabled=true;saveButton.textContent='Yükleniyor…';
     const metadata={id,title:String(f.get('title')||'').trim()||file.name,platform_id:f.get('platform_id'),report_type:f.get('report_type'),period_start:periodStart,period_end:periodEnd,agency_id:f.get('agency_id')||null,original_filename:file.name,storage_path:storagePath,content_type:contentType,file_size:file.size,uploaded_by:profile.id};
@@ -259,7 +271,7 @@ async function renderFinance() {
 
 function monthDates() {
   const now=new Date();
-  return {start:new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10),end:new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().slice(0,10)};
+  return {start:dateInputValue(new Date(now.getFullYear(),now.getMonth(),1)),end:dateInputValue(new Date(now.getFullYear(),now.getMonth()+1,0))};
 }
 
 async function renderMyPaymentStatus() {
@@ -327,7 +339,7 @@ async function renderEmployeePayments() {
   paymentForm.elements.period_start.addEventListener('change',()=>refreshAssistantCommission());
   paymentForm.elements.period_end.addEventListener('change',()=>refreshAssistantCommission());
   document.querySelector('#cancel-payment').addEventListener('click',()=>{paymentForm.reset();document.querySelector('#payment-form-box').classList.add('hidden');});
-  paymentForm.addEventListener('submit',async event=>{event.preventDefault();const f=new FormData(paymentForm);const due=parseLocalizedAmount(f.get('amount_due')),amount=parseLocalizedAmount(f.get('amount'));if(!Number.isFinite(due)||due<=0||!Number.isFinite(amount)||amount<=0)return msg('Dönem tutarı ile ödenen tutarı kontrol et.',true);if(f.get('period_end')<f.get('period_start'))return msg('Dönem bitişi başlangıçtan önce olamaz.',true);const save=document.querySelector('#payment-save');save.disabled=true;save.textContent='Kaydediliyor…';const {data,error}=await db.rpc('record_employee_payment',{p_employee_id:f.get('employee_id'),p_period_type:f.get('period_type'),p_period_start:f.get('period_start'),p_period_end:f.get('period_end'),p_amount_due:due,p_amount:amount,p_currency:f.get('currency'),p_paid_on:f.get('paid_on'),p_note:String(f.get('note')||'').trim()||null});save.disabled=false;save.textContent='Ödendi ve giderlere işle';if(error)return msg(error.message,true);const result=Array.isArray(data)?data[0]:data;document.querySelector('#payment-form-box').classList.add('hidden');msg(result?.is_paid?'Ödeme tamamlandı ve giderlere işlendi.':'Kısmi ödeme giderlere işlendi; kalan tutar beklemede.');await renderEmployeePayments();});
+  paymentForm.addEventListener('submit',async event=>{event.preventDefault();const f=new FormData(paymentForm);const due=parseLocalizedAmount(f.get('amount_due')),amount=parseLocalizedAmount(f.get('amount'));if(!Number.isFinite(due)||due<=0||!Number.isFinite(amount)||amount<=0)return msg('Dönem tutarı ile ödenen tutarı kontrol et.',true);if(f.get('period_end')<f.get('period_start'))return msg('Dönem bitişi başlangıçtan önce olamaz.',true);if(f.get('period_type')==='weekly'&&!isMondayToSunday(f.get('period_start'),f.get('period_end')))return msg('Haftalık ödeme dönemi pazartesi başlamalı ve pazar bitmeli.',true);const save=document.querySelector('#payment-save');save.disabled=true;save.textContent='Kaydediliyor…';const {data,error}=await db.rpc('record_employee_payment',{p_employee_id:f.get('employee_id'),p_period_type:f.get('period_type'),p_period_start:f.get('period_start'),p_period_end:f.get('period_end'),p_amount_due:due,p_amount:amount,p_currency:f.get('currency'),p_paid_on:f.get('paid_on'),p_note:String(f.get('note')||'').trim()||null});save.disabled=false;save.textContent='Ödendi ve giderlere işle';if(error)return msg(error.message,true);const result=Array.isArray(data)?data[0]:data;document.querySelector('#payment-form-box').classList.add('hidden');msg(result?.is_paid?'Ödeme tamamlandı ve giderlere işlendi.':'Kısmi ödeme giderlere işlendi; kalan tutar beklemede.');await renderEmployeePayments();});
 }
 
 async function renderPerformance() {
@@ -382,7 +394,7 @@ async function renderPerformance() {
   };
   wirePerformanceRowActions();
   if(filterable) document.querySelector('#performance-filter').addEventListener('change',event=>{const selected=event.currentTarget.value;const visible=selected==='all'?rows:rows.filter(r=>(r.report_type||'assistant')===selected);document.querySelector('#performance-table-card').innerHTML=table(columns,visible.map(makeRow),'Bu rapor türünde kayıt yok.');wirePerformanceRowActions();});
-  form.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(form);const kind=editingReportType||(profile.role==='admin'?f.get('report_type'):initialType);const selectedUser=profile.role==='admin'?profiles.find(p=>p.id===f.get('user_id')):profile;if(!selectedUser)return msg('Önce kişiyi seç.',true);if(f.get('period_end')<f.get('period_start'))return msg('Hafta bitişi başlangıç tarihinden önce olamaz.',true);
+  form.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(form);const kind=editingReportType||(profile.role==='admin'?f.get('report_type'):initialType);const selectedUser=profile.role==='admin'?profiles.find(p=>p.id===f.get('user_id')):profile;if(!selectedUser)return msg('Önce kişiyi seç.',true);if(f.get('period_end')<f.get('period_start'))return msg('Hafta bitişi başlangıç tarihinden önce olamaz.',true);if(!isMondayToSunday(f.get('period_start'),f.get('period_end')))return msg('Haftalık performans dönemi pazartesi başlamalı ve pazar bitmeli.',true);
     const input={user_id:selectedUser.id,agency_id:selectedUser.agency_id||null,platform_id:f.get('platform_id')&&f.get('platform_id')!=='all'?f.get('platform_id'):null,period_start:f.get('period_start'),period_end:f.get('period_end'),report_type:kind,phone_numbers_count:kind==='assistant'?Number(f.get('phone_numbers_count')||0):0,applications_count:0,registrations_count:kind==='assistant'?Number(f.get('registrations_count')||0):0,active_creators_count:0,quota_completed:kind==='consultant'?Number(f.get('quota_completed')||0):0,background_quota:kind==='consultant'?Number(f.get('background_quota')||0):0,weekly_issues:kind==='consultant'?(f.get('weekly_issues')||null):null,solution_suggestions:kind==='consultant'?(f.get('solution_suggestions')||null):null,revenue_contribution:profile.role==='admin'?Number(f.get('revenue_contribution')||0):0,currency:profile.role==='admin'?f.get('currency'):'GBP',note:null,entered_by:profile.id};
     const query=editingRecordId?db.from('performance_entries').update(input).eq('id',editingRecordId):db.from('performance_entries').insert(input);const {error}=await query;if(error)return msg(error.message,true);msg(editingRecordId?'Performans raporu güncellendi.':'Haftalık rapor kaydedildi.');renderPerformance();});
 }
@@ -420,7 +432,7 @@ async function renderReferrals(filters={}) {
   const form=document.querySelector('#referral-form');
   document.querySelector('#toggle-referral-form').addEventListener('click',()=>{form.reset();form.elements.record_id.value='';form.elements.period_start.value=week.start;form.elements.period_end.value=week.end;document.querySelector('#referral-form-title').textContent='Referans kaydı ekle';document.querySelector('#referral-save').textContent='Kaydet';document.querySelector('#referral-form-card').classList.toggle('hidden');});
   document.querySelector('#cancel-referral').addEventListener('click',()=>{form.reset();form.elements.record_id.value='';document.querySelector('#referral-form-title').textContent='Referans kaydı ekle';document.querySelector('#referral-save').textContent='Kaydet';document.querySelector('#referral-form-card').classList.add('hidden');});
-  form.addEventListener('submit',async event=>{event.preventDefault();const f=new FormData(form);if(f.get('period_end')<f.get('period_start'))return msg('Hafta bitişi başlangıç tarihinden önce olamaz.',true);const recordId=f.get('record_id');const payload={platform_id:f.get('platform_id'),period_start:f.get('period_start'),period_end:f.get('period_end'),referred_creator_id:String(f.get('referred_creator_id')).trim(),referred_creator_phone:String(f.get('referred_creator_phone')).trim(),referrer_name:String(f.get('referrer_name')).trim(),referrer_phone:String(f.get('referrer_phone')).trim(),submitted_by:recordId?records.find(r=>r.id===recordId)?.submitted_by||profile.id:profile.id,updated_at:new Date().toISOString()};const result=recordId?await db.from('referral_entries').update(payload).eq('id',recordId):await db.from('referral_entries').insert(payload);if(result.error)return msg(result.error.message,true);msg(recordId?'Referans kaydı güncellendi.':'Referans kaydı eklendi.');await renderReferrals({start:document.querySelector('#referral-filter-start').value,end:document.querySelector('#referral-filter-end').value,platform:document.querySelector('#referral-filter-platform').value});});
+  form.addEventListener('submit',async event=>{event.preventDefault();const f=new FormData(form);if(f.get('period_end')<f.get('period_start'))return msg('Hafta bitişi başlangıç tarihinden önce olamaz.',true);if(!isMondayToSunday(f.get('period_start'),f.get('period_end')))return msg('Referans haftası pazartesi başlamalı ve pazar bitmeli.',true);const recordId=f.get('record_id');const payload={platform_id:f.get('platform_id'),period_start:f.get('period_start'),period_end:f.get('period_end'),referred_creator_id:String(f.get('referred_creator_id')).trim(),referred_creator_phone:String(f.get('referred_creator_phone')).trim(),referrer_name:String(f.get('referrer_name')).trim(),referrer_phone:String(f.get('referrer_phone')).trim(),submitted_by:recordId?records.find(r=>r.id===recordId)?.submitted_by||profile.id:profile.id,updated_at:new Date().toISOString()};const result=recordId?await db.from('referral_entries').update(payload).eq('id',recordId):await db.from('referral_entries').insert(payload);if(result.error)return msg(result.error.message,true);msg(recordId?'Referans kaydı güncellendi.':'Referans kaydı eklendi.');await renderReferrals({start:document.querySelector('#referral-filter-start').value,end:document.querySelector('#referral-filter-end').value,platform:document.querySelector('#referral-filter-platform').value});});
   page.querySelectorAll('[data-edit-referral]').forEach(button=>button.addEventListener('click',()=>{const record=records.find(r=>r.id===button.dataset.editReferral);if(!record)return;for(const key of ['record_id','platform_id','period_start','period_end','referred_creator_id','referred_creator_phone','referrer_name','referrer_phone'])form.elements[key].value=key==='record_id'?record.id:record[key]||'';document.querySelector('#referral-form-title').textContent='Referans kaydını düzenle';document.querySelector('#referral-save').textContent='Değişiklikleri kaydet';document.querySelector('#referral-form-card').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}));
   page.querySelectorAll('[data-delete-referral]').forEach(button=>button.addEventListener('click',async()=>{if(!confirm('Bu referans kaydını silmek istiyor musun?'))return;const {error:deleteError}=await db.from('referral_entries').delete().eq('id',button.dataset.deleteReferral);if(deleteError)return msg(deleteError.message,true);msg('Referans kaydı silindi.');await renderReferrals({start:document.querySelector('#referral-filter-start').value,end:document.querySelector('#referral-filter-end').value,platform:document.querySelector('#referral-filter-platform').value});}));
 }
@@ -431,8 +443,8 @@ async function renderPkEvents(filters={}) {
     ? await (async()=>{const {data,error}=await db.from('consultant_platforms').select('platform_id').eq('user_id',profile.id);if(error)throw error;const ids=new Set((data||[]).map(x=>x.platform_id));return platforms.filter(p=>ids.has(p.id));})().catch(error=>{page.innerHTML=titleBlock('PK Takip','Sunucu programları ve afişleri.')+`<div class="empty">${esc(error.message)}</div>`;return null;})
     : platforms.filter(p=>p.status==='active');
   if(!allowedPlatforms)return;
-  const dateStart=filters.start||new Date(Date.now()-90*86400000).toISOString().slice(0,10);
-  const dateEnd=filters.end||new Date(Date.now()+60*86400000).toISOString().slice(0,10);
+  const dateStart=filters.start||shiftedLocalDate(-90);
+  const dateEnd=filters.end||shiftedLocalDate(60);
   const selectedPlatform=filters.platform||'all';
   let query=db.from('pk_events').select('*,platforms(name)').gte('event_date',dateStart).lte('event_date',dateEnd).order('event_date',{ascending:true}).order('event_time',{ascending:true}).limit(1000);
   if(selectedPlatform!=='all')query=query.eq('platform_id',selectedPlatform);
