@@ -17,6 +17,7 @@ create table if not exists public.profiles (
   username text not null,
   email text not null,
   full_name text not null,
+  display_name text,
   phone text,
   role text not null check (role in ('admin','assistant','consultant','subagency_owner')),
   agency_id uuid references public.agencies(id) on delete set null,
@@ -25,6 +26,8 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 create unique index if not exists profiles_username_lower_uidx on public.profiles(lower(username));
+
+alter table public.profiles add column if not exists display_name text;
 
 alter table public.agencies add column if not exists owner_user_id uuid unique references auth.users(id) on delete set null;
 
@@ -176,6 +179,7 @@ revoke all on public.agencies, public.profiles, public.platforms, public.applica
   public.creators, public.financial_entries, public.performance_entries from anon, authenticated;
 revoke all on public.consultant_platforms, public.platform_reports from anon, authenticated;
 grant select on public.profiles, public.platforms to authenticated;
+grant update(display_name) on public.profiles to authenticated;
 grant select, insert, update on public.applications to authenticated;
 grant select, insert, update, delete on public.creators to authenticated;
 grant select, insert, update, delete on public.financial_entries, public.performance_entries to authenticated;
@@ -191,6 +195,9 @@ drop policy if exists profiles_read_scope on public.profiles;
 create policy profiles_read_scope on public.profiles for select to authenticated
 using (id = auth.uid() or public.is_admin() or
   (public.current_profile_role() = 'subagency_owner' and agency_id = public.current_agency_id()));
+drop policy if exists profiles_update_display_name_admin on public.profiles;
+create policy profiles_update_display_name_admin on public.profiles for update to authenticated
+using (public.is_admin()) with check (public.is_admin());
 
 drop policy if exists platforms_read_signed_in on public.platforms;
 create policy platforms_read_signed_in on public.platforms for select to authenticated using (true);

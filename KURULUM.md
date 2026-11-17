@@ -12,6 +12,7 @@ Bu klasör, gerçek giriş ve kayıt sistemi için başlangıç paketidir. Aray�
 - `supabase/migrations/2026-11-16-admin-only-delete-creators.sql`: yayıncı kayıtlarını yalnızca yöneticinin silebilmesini sağlar.
 - `supabase/migrations/2026-11-16-employee-payment-table.sql`: yöneticiye özel çalışan ödeme tablosu ile personele yalnızca kendi ödeme durumunu gösteren güvenli işlevi ekler.
 - `supabase/migrations/2026-11-16-employee-assistant-payment-group.sql`: kayıt asistanlarını tüm uygulamalardan bağımsız gruba alır; bu ödemelerin giderlerini genel kayıt olarak işler.
+- `supabase/migrations/2026-11-17-profile-display-names.sql`: gerçek ad-soyaddan ayrı, yönetici tarafından düzenlenen panel görünen adlarını ekler.
 - `supabase/functions/`: kullanıcı adıyla giriş, yönetici hesabı açma/kapatma ve ilk giriş parolası yenileme işlevleri.
 
 ## Kurulum sırası
@@ -87,6 +88,12 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 - Yönetici **Ödeme ekle** ile ödeme türü, dönem, ödenecek tutar, şimdi ödenen tutar ve tarihi girer. Ödeme otomatik olarak uygulamaya bağlı gider olarak eklenir. Kısmi ödeme girilirse kalan tutar beklemede kalır ve aynı döneme ek ödeme girilebilir.
 - Ödeme düzeltme/silme yalnızca yönetici ödeme geçmişinden yapılır; bağlı gider kaydı da birlikte silinir. Gelir & Gider ekranında çalışan ödeme giderleri salt görüntülenir.
 - Daha önce çalışan ödeme tablosu SQL'ini çalıştırdıysan yalnızca yeni `supabase/migrations/2026-11-16-employee-assistant-payment-group.sql` dosyasını Supabase SQL Editor'de bir kez çalıştır. İlk ödeme tablosu SQL'ini henüz çalıştırmadıysan önce `supabase/migrations/2026-11-16-employee-payment-table.sql`, ardından bu yeni dosyayı çalıştır. Sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükleyip commit et. Çalışan hesabı varsa, ödeme tablosundaki çalışan kaydını o hesapla eşleştir.
+
+## Panelde görünen çalışan adları
+
+- Kullanıcı Yönetimi tablosunda **Görünen adı düzenle** seçeneğiyle çalışan için panelde kullanılacak adı belirleyebilirsin. Rol (ör. Danışman) ayrı gösterilir; görünen ada yalnızca kişinin kullanacağı adı yazmak yeterlidir. Görünen adı boş bırakırsan gerçek ad-soyad varsayılan olarak kullanılır.
+- Bu ad sol alttaki hesap alanında, kullanıcı listelerinde ve performans kayıtlarında görünür. Gerçek `Ad soyad` profilde değiştirilmez.
+- Var olan Supabase projesinde `supabase/migrations/2026-11-17-profile-display-names.sql` dosyasını SQL Editor'de bir kez çalıştır, sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükleyip commit et.
 
 ## Bu sürümün sınırı
 
