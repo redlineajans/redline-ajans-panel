@@ -102,6 +102,8 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 
 - **Referans Kayıtları** bölümü yönetici, asistan/kayıtçı ve danışman hesaplarında görünür. Asistanlar uygulama ve hafta seçip kayıt ekleyebilir; kendi girdiklerini düzenleyebilir. Danışmanlar yalnızca Kullanıcı Yönetimi'nde kendilerine atanmış uygulamaların kayıtlarını görür. Yönetici tüm uygulamaları görür, düzenler ve siler; çalışanlar kayıt silemez.
 - Her satırda hafta, uygulama, referansla gelen yayıncının ID ve telefonu, onu referans eden kişinin adı ve telefonu tutulur. Uygulama seçimi, “Lu200” gibi uygulama etiketini ayrıca yazma ihtiyacını kaldırır.
+- Referans satırında ödeme durumu **Referans Ödemesi Var** (tutar ve para birimiyle) ya da **Referans Ödemesi Yoktur** olarak işaretlenebilir. Yönetici, kaydı giren asistan ve yetkili danışman ödeme bilgisini güncelleyebilir; asistanlar tüm referansların ödeme durumunu görebilir.
+- Var olan Supabase projesinde `supabase/migrations/2026-11-18-referral-payment-status.sql` dosyasını bir kez çalıştır.
 - Var olan Supabase projesinde `supabase/migrations/2026-11-17-weekly-referral-entries.sql` dosyasını SQL Editor'de bir kez çalıştır; sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükleyip commit et.
 
 ## Sunucular ve PK Takip
