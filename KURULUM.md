@@ -111,6 +111,7 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 - Afişler `pk-posters` adlı özel Storage alanında saklanır ve yalnızca ilgili PK kaydına yetkili hesaplarca görüntülenebilir. Afiş dosyası 20 MB'ı geçmemelidir.
 - Var olan Supabase projesinde `supabase/migrations/2026-11-17-pk-host-tracking.sql` dosyasını SQL Editor'de bir kez çalıştır. Sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükle. Yeni **Sunucu** hesapları açabilmek için paketteki `supabase/functions/manage-users/index.ts` dosyasını Supabase Edge Functions'taki `manage-users` işlevine yükleyip yeniden dağıt.
 - Sunucu PK tamamlandıktan sonra kendisine atanmış kayıtta **Sunuldu** veya **Sunulmadı** seçip kaydedebilir. Yönetici ve ilgili danışman bu durumu görür. Mevcut projede `supabase/migrations/2026-11-18-pk-presentation-status.sql` dosyasını bir kez çalıştır.
+- PK kaydı eklerken RLS hatası alınırsa supabase/migrations/2026-11-18-pk-create-event-rpc.sql dosyasını da bir kez çalıştır.
 
 ## Bu sürümün sınırı
 
