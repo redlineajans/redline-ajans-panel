@@ -128,6 +128,7 @@ function buildNav() {
   else if (['assistant','consultant','host'].includes(profile.role)) entries.push({id:'my-payments',icon:'✓',name:'Ödeme Durumum'});
   if (['admin','subagency_owner'].includes(profile.role)) entries.push({id:'finance',icon:'₺',name:'Gelir & Gider'});
   if(profile.role!=='host')entries.push({id:'performance',icon:'↗',name:'Performans'});
+  if(profile.role==='host')entries.push({id:'host-performance',icon:'✓',name:'Sunucu Performansı'});
   if (['admin','assistant','consultant'].includes(profile.role)) entries.push({id:'referrals',icon:'↗',name:'Referans Kayıtları'});
   if (['admin','consultant','host'].includes(profile.role)) entries.push({id:'pk',icon:'★',name:'PK Takip'});
   if (profile.role === 'admin') entries.push({id:'users',icon:'♧',name:'Kullanıcı Yönetimi'});
@@ -141,9 +142,10 @@ function buildNav() {
 }
 
 async function openPage(id) {
+  if(profile.role==='host'&&!['overview','my-payments','pk','host-performance'].includes(id))return openPage('overview');
   currentPage=id;
   const platform = id.startsWith('platform:') ? platforms.find(p=>p.id===id.split(':')[1]) : null;
-  const title = platform?.name || ({overview:'Genel Bakış',reports:'Raporlar',payments:'Çalışan Ödeme Tablosu','my-payments':'Ödeme Durumum',finance:'Gelir & Gider',performance:'Performans',referrals:'Referans Kayıtları',pk:'PK Takip',users:'Kullanıcı Yönetimi'}[id] || 'Panel');
+  const title = platform?.name || ({overview:'Genel Bakış',reports:'Raporlar',payments:'Çalışan Ödeme Tablosu','my-payments':'Ödeme Durumum',finance:'Gelir & Gider',performance:'Performans','host-performance':'Sunucu Performansı',referrals:'Referans Kayıtları',pk:'PK Takip',users:'Kullanıcı Yönetimi'}[id] || 'Panel');
   document.querySelector('#breadcrumb').textContent=title;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
   msg('');
@@ -154,6 +156,7 @@ async function openPage(id) {
   if (id==='my-payments') return renderMyPaymentStatus();
   if (id==='finance') return renderFinance();
   if (id==='performance') return renderPerformance();
+  if (id==='host-performance') return renderHostPerformance();
   if (id==='referrals') return renderReferrals();
   if (id==='pk') return renderPkEvents();
   if (id==='users') return renderUsers();
@@ -166,6 +169,11 @@ function table(headers, rows, empty='Henüz kayıt yok.') { return `<div class="
 function platformOptions(selected='',includeAll=false) { return `<option value="">Platform seç</option>${includeAll?'<option value="all">Hepsi / Genel kayıt</option>':''}${platforms.map(p=>`<option value="${p.id}" ${p.id===selected?'selected':''}>${esc(p.name)}</option>`).join('')}`; }
 function roleUsersOptions(selected='') { return `<option value="">Kendime ata</option>${profiles.filter(p=>p.active).map(p=>`<option value="${p.id}" ${p.id===selected?'selected':''}>${esc(visibleName(p))} · ${esc(roleName(p.role))}</option>`).join('')}`; }
 async function renderOverview() {
+  if(profile.role==='host') {
+    page.innerHTML=`${titleBlock('Genel Bakış','Buradan PK programlarını, tamamlanan sunumlarını ve ödeme durumunu takip edebilirsin.')}<div class="columns"><article class="card"><h2>PK Takip</h2><p>Sana atanmış PK programlarını, afişleri ve sunum durumunu görüntüle.</p><button class="button primary" data-open="pk">PK Takip’i aç</button></article><article class="card"><h2>Sunucu Performansı</h2><p>Sunumunu yaptığın PK kayıtlarını görüntüle.</p><button class="button" data-open="host-performance">Sunucu performansını aç</button></article><article class="card"><h2>Ödeme Durumum</h2><p>Ödemelerinin ödendi / ödenmedi durumunu görüntüle.</p><button class="button" data-open="my-payments">Ödeme durumunu aç</button></article></div>`;
+    page.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',()=>openPage(button.dataset.open)));
+    return;
+  }
   const count = async tableName => { const {count}=await db.from(tableName).select('id',{count:'exact',head:true}); return count||0; };
   const [reportCount,financeResult,performanceResult] = await Promise.all([
     count(profile.role==='assistant'?'performance_entries':'platform_reports'), db.from('financial_entries').select('entry_type,amount,currency'), db.from('performance_entries').select('revenue_contribution,currency')
@@ -481,6 +489,14 @@ async function renderPkEvents(filters={}) {
   page.querySelectorAll('[data-delete-pk]').forEach(button=>button.addEventListener('click',async()=>{const event=events.find(x=>x.id===button.dataset.deletePk);if(!event||!confirm('PK kaydı ve afişi silinsin mi?'))return;if(event.poster_path){const {error:posterError}=await db.storage.from('pk-posters').remove([event.poster_path]);if(posterError)return msg(posterError.message,true);}const {error:deleteError}=await db.from('pk_events').delete().eq('id',event.id);if(deleteError)return msg(deleteError.message,true);msg('PK kaydı silindi.');await renderPkEvents({platform:document.querySelector('#pk-filter-platform').value,start:document.querySelector('#pk-filter-start').value,end:document.querySelector('#pk-filter-end').value});}));
 }
 
+async function renderHostPerformance() {
+  const {data,error}=await db.from('pk_events').select('*,platforms(name)').eq('presentation_status','performed').order('event_date',{ascending:false}).order('event_time',{ascending:false}).limit(1000);
+  if(error)return page.innerHTML=titleBlock('Sunucu Performansı','Yalnızca sunumunu tamamladığın PK kayıtları.')+`<div class="empty">${esc(error.message)}<br>Sunum durumu SQL güncellemesi henüz çalıştırılmamış olabilir.</div>`;
+  const records=data||[],posterLinks=new Map();
+  await Promise.all(records.filter(row=>row.poster_path).map(async row=>{const {data:signed}=await db.storage.from('pk-posters').createSignedUrl(row.poster_path,300);if(signed?.signedUrl)posterLinks.set(row.id,signed.signedUrl);}));
+  const rows=records.map(row=>{const poster=posterLinks.get(row.id);return `<tr><td>${poster?`<a href="${esc(poster)}" target="_blank" rel="noopener"><img class="pk-poster-thumb" src="${esc(poster)}" alt="${esc(row.event_name)} PK afişi"></a>`:'Afiş yok'}</td><td>${esc(row.event_name)}</td><td>${esc(row.platforms?.name||'—')}</td><td>${niceDate(row.event_date)} · ${esc(String(row.event_time).slice(0,5))}</td><td>${esc(row.tracking_code||'—')}</td><td><span class="pill">Sunuldu</span></td></tr>`;});
+  page.innerHTML=`${titleBlock('Sunucu Performansı','Burada yalnızca sunumunu yaptığın ve Sunuldu olarak işaretlenen PK kayıtları görünür.')}${cardMetric('Tamamlanan PK',records.length,'Sana atanmış Sunuldu kayıtları')}<article class="card">${table(['Afiş','PK adı','Uygulama','Tarih / saat','EVT takip kodu','Sunum durumu'],rows,'Henüz Sunuldu olarak işaretlenmiş PK kaydı yok.')}</article>`;
+}
 async function renderUsers() {
   await loadProfiles();
   const {data:assignmentRows,error:assignmentError}=await db.from('consultant_platforms').select('user_id,platform_id');
