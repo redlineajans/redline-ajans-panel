@@ -128,7 +128,7 @@ function buildNav() {
   else if (['assistant','consultant','host'].includes(profile.role)) entries.push({id:'my-payments',icon:'✓',name:'Ödeme Durumum'});
   if (['admin','subagency_owner'].includes(profile.role)) entries.push({id:'finance',icon:'₺',name:'Gelir & Gider'});
   if(profile.role!=='host')entries.push({id:'performance',icon:'↗',name:'Performans'});
-  if(profile.role==='host')entries.push({id:'host-performance',icon:'✓',name:'Sunucu Performansı'});
+  if(['admin','consultant','host'].includes(profile.role))entries.push({id:'host-performance',icon:'✓',name:'Sunucu Performansı'});
   if (['admin','assistant','consultant'].includes(profile.role)) entries.push({id:'referrals',icon:'↗',name:'Referans Kayıtları'});
   if (['admin','consultant','host'].includes(profile.role)) entries.push({id:'pk',icon:'★',name:'PK Takip'});
   if (profile.role === 'admin') entries.push({id:'users',icon:'♧',name:'Kullanıcı Yönetimi'});
@@ -143,6 +143,7 @@ function buildNav() {
 
 async function openPage(id) {
   if(profile.role==='host'&&!['overview','my-payments','pk','host-performance'].includes(id))return openPage('overview');
+  if(profile.role==='consultant'&&!['overview','reports','my-payments','performance','referrals','pk','host-performance'].includes(id))return openPage('overview');
   currentPage=id;
   const platform = id.startsWith('platform:') ? platforms.find(p=>p.id===id.split(':')[1]) : null;
   const title = platform?.name || ({overview:'Genel Bakış',reports:'Raporlar',payments:'Çalışan Ödeme Tablosu','my-payments':'Ödeme Durumum',finance:'Gelir & Gider',performance:'Performans','host-performance':'Sunucu Performansı',referrals:'Referans Kayıtları',pk:'PK Takip',users:'Kullanıcı Yönetimi'}[id] || 'Panel');
@@ -491,11 +492,12 @@ async function renderPkEvents(filters={}) {
 
 async function renderHostPerformance() {
   const {data,error}=await db.from('pk_events').select('*,platforms(name)').eq('presentation_status','performed').order('event_date',{ascending:false}).order('event_time',{ascending:false}).limit(1000);
-  if(error)return page.innerHTML=titleBlock('Sunucu Performansı','Yalnızca sunumunu tamamladığın PK kayıtları.')+`<div class="empty">${esc(error.message)}<br>Sunum durumu SQL güncellemesi henüz çalıştırılmamış olabilir.</div>`;
+  const subtitle=profile.role==='host'?'Yalnızca sunumunu tamamladığın PK kayıtları.':profile.role==='consultant'?'Yetkili olduğun uygulamalardaki sunulmuş PK kayıtları.':'Tüm uygulamalarda sunulmuş PK kayıtları.';
+  if(error)return page.innerHTML=titleBlock('Sunucu Performansı',subtitle)+`<div class="empty">${esc(error.message)}<br>Sunum durumu SQL güncellemesi henüz çalıştırılmamış olabilir.</div>`;
   const records=data||[],posterLinks=new Map();
   await Promise.all(records.filter(row=>row.poster_path).map(async row=>{const {data:signed}=await db.storage.from('pk-posters').createSignedUrl(row.poster_path,300);if(signed?.signedUrl)posterLinks.set(row.id,signed.signedUrl);}));
-  const rows=records.map(row=>{const poster=posterLinks.get(row.id);return `<tr><td>${poster?`<a href="${esc(poster)}" target="_blank" rel="noopener"><img class="pk-poster-thumb" src="${esc(poster)}" alt="${esc(row.event_name)} PK afişi"></a>`:'Afiş yok'}</td><td>${esc(row.event_name)}</td><td>${esc(row.platforms?.name||'—')}</td><td>${niceDate(row.event_date)} · ${esc(String(row.event_time).slice(0,5))}</td><td>${esc(row.tracking_code||'—')}</td><td><span class="pill">Sunuldu</span></td></tr>`;});
-  page.innerHTML=`${titleBlock('Sunucu Performansı','Burada yalnızca sunumunu yaptığın ve Sunuldu olarak işaretlenen PK kayıtları görünür.')}${cardMetric('Tamamlanan PK',records.length,'Sana atanmış Sunuldu kayıtları')}<article class="card">${table(['Afiş','PK adı','Uygulama','Tarih / saat','EVT takip kodu','Sunum durumu'],rows,'Henüz Sunuldu olarak işaretlenmiş PK kaydı yok.')}</article>`;
+  const rows=records.map(row=>{const poster=posterLinks.get(row.id);return `<tr><td>${poster?`<a href="${esc(poster)}" target="_blank" rel="noopener"><img class="pk-poster-thumb" src="${esc(poster)}" alt="${esc(row.event_name)} PK afişi"></a>`:'Afiş yok'}</td><td>${esc(row.event_name)}</td><td>${esc(row.platforms?.name||'—')}</td><td>${niceDate(row.event_date)} · ${esc(String(row.event_time).slice(0,5))}</td><td>${esc((row.host_names||[]).join(', ')||'—')}</td><td>${esc(row.tracking_code||'—')}</td><td><span class="pill">Sunuldu</span></td></tr>`;});
+  page.innerHTML=`${titleBlock('Sunucu Performansı',subtitle)}${cardMetric('Tamamlanan PK',records.length,profile.role==='host'?'Sana atanmış Sunuldu kayıtları':'Görüntüleme yetkindeki Sunuldu kayıtları')}<article class="card">${table(['Afiş','PK adı','Uygulama','Tarih / saat','Sunucu(lar)','EVT takip kodu','Sunum durumu'],rows,'Henüz Sunuldu olarak işaretlenmiş PK kaydı yok.')}</article>`;
 }
 async function renderUsers() {
   await loadProfiles();
