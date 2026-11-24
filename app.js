@@ -8,7 +8,7 @@ const login = document.querySelector('#login');
 const app = document.querySelector('#app');
 const page = document.querySelector('#page');
 const notice = document.querySelector('#notice');
-let db, session, profile, platforms = [], profiles = [], currentPage = 'overview';
+let db, session, profile, platforms = [], profiles = [], assignedPlatformIds = new Set(), currentPage = 'overview';
 
 if (!ready) setup.classList.remove('hidden');
 else {
@@ -105,6 +105,11 @@ async function enter(nextSession, forcePasswordChange = false) {
   document.querySelector('#user-role').textContent = roleName(profile.role);
   document.querySelector('#user-avatar').textContent = visibleName(profile).split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase();
   await loadPlatforms();
+  assignedPlatformIds=new Set();
+  if(['consultant','room_assistant'].includes(profile.role)) {
+    const {data:assigned}=await db.from('consultant_platforms').select('platform_id').eq('user_id',profile.id);
+    assignedPlatformIds=new Set((assigned||[]).map(item=>item.platform_id));
+  }
   buildNav();
   if (forcePasswordChange || profile.must_change_password) return renderPasswordChange();
   await openPage('overview');
@@ -135,7 +140,7 @@ function buildNav() {
   if (profile.role === 'admin') entries.push({id:'users',icon:'♧',name:'Kullanıcı Yönetimi'});
   if(!['host','room_assistant'].includes(profile.role)){
     entries.push({heading:'UYGULAMALAR'});
-    platforms.forEach(p=>entries.push({id:`platform:${p.id}`,icon:p.name.slice(0,1).toUpperCase(),name:p.name,status:p.status}));
+    platforms.filter(p=>profile.role!=='consultant'||assignedPlatformIds.has(p.id)).forEach(p=>entries.push({id:`platform:${p.id}`,icon:p.name.slice(0,1).toUpperCase(),name:p.name,status:p.status}));
   }
   const nav=document.querySelector('#nav');
   nav.innerHTML=entries.map(item=>item.heading?`<div class="nav-heading">${esc(item.heading)}</div>`:`<button data-page="${esc(item.id)}" class="${item.id===currentPage?'active':''}"><span class="nav-symbol">${esc(item.icon)}</span>${esc(item.name)}${item.status?`<span class="nav-status">${item.status==='active'?'Aktif':item.status==='review'?'Kontrol':'Pasif'}</span>`:''}</button>`).join('');
@@ -146,6 +151,7 @@ async function openPage(id) {
   if(profile.role==='host'&&!['overview','my-payments','pk','host-performance'].includes(id))return openPage('overview');
   if(profile.role==='consultant'&&!['overview','reports','my-payments','performance','referrals','pk','host-performance','room-operations'].includes(id))return openPage('overview');
   if(profile.role==='room_assistant'&&!['overview','reports','room-operations','my-payments'].includes(id))return openPage('overview');
+  if(profile.role==='consultant'&&id.startsWith('platform:')&&!assignedPlatformIds.has(id.slice('platform:'.length)))return openPage('overview');
   currentPage=id;
   const platform = id.startsWith('platform:') ? platforms.find(p=>p.id===id.split(':')[1]) : null;
   const title = platform?.name || ({overview:'Genel Bakış',reports:'Raporlar',payments:'Çalışan Ödeme Tablosu','my-payments':'Ödeme Durumum',finance:'Gelir & Gider',performance:'Performans','host-performance':'Sunucu Performansı','room-operations':'Oda Operasyonları',referrals:'Referans Kayıtları',pk:'PK Takip',users:'Kullanıcı Yönetimi'}[id] || 'Panel');
