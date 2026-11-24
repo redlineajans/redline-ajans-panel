@@ -15,6 +15,7 @@ Bu klasör, gerçek giriş ve kayıt sistemi için başlangıç paketidir. Aray�
 - `supabase/migrations/2026-11-17-profile-display-names.sql`: gerçek ad-soyaddan ayrı, yönetici tarafından düzenlenen panel görünen adlarını ekler.
 - `supabase/migrations/2026-11-17-weekly-referral-entries.sql`: uygulama ve haftaya bağlı referans kayıtlarını, danışman uygulama yetkisine göre korunan erişim kurallarıyla ekler.
 - `supabase/migrations/2026-11-17-pk-host-tracking.sql`: Sunucu rolü, özel PK afiş alanı ve uygulama yetkisine göre PK takibini ekler.
+- `supabase/migrations/2026-11-25-room-assistant-operations.sql`: Oda Asistanı rolünü, uygulama bazlı rapor erişimini ve günlük yayıncı takibi / Baş Asistana yönlendirme kayıtlarını ekler.
 - `supabase/functions/`: kullanıcı adıyla giriş, yönetici hesabı açma/kapatma ve ilk giriş parolası yenileme işlevleri.
 
 ## Kurulum sırası
@@ -114,6 +115,13 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 - Var olan Supabase projesinde `supabase/migrations/2026-11-17-pk-host-tracking.sql` dosyasını SQL Editor'de bir kez çalıştır. Sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükle. Yeni **Sunucu** hesapları açabilmek için paketteki `supabase/functions/manage-users/index.ts` dosyasını Supabase Edge Functions'taki `manage-users` işlevine yükleyip yeniden dağıt.
 - Sunucu PK tamamlandıktan sonra kendisine atanmış kayıtta **Sunuldu** veya **Sunulmadı** seçip kaydedebilir. Yönetici ve ilgili danışman bu durumu görür. Sunucunun, yöneticinin ve danışmanın **Sunucu Performansı** bölümü yalnızca Sunuldu olarak işaretlenen kayıtları listeler; danışman yalnızca yetkili olduğu uygulamaları görür. Mevcut projede `supabase/migrations/2026-11-18-pk-presentation-status.sql` dosyasını bir kez çalıştır.
 - PK kaydı eklerken RLS hatası alınırsa supabase/migrations/2026-11-18-pk-create-event-rpc.sql dosyasını da bir kez çalıştır.
+
+## Oda Asistanı ve günlük takip
+
+- Kullanıcı Yönetimi'nden yeni hesabı **Oda Asistanı** rolüyle oluştur; ardından **Uygulamaları ata** ile sorumlu olduğu uygulamaları seç. Mevcut **Danışman** rolü değişmez; danışmanlar Baş Asistan olarak kalır.
+- Yönetici günlük/haftalık uygulama raporlarını **Raporlar** bölümüne yükler. Oda Asistanı yalnızca atandığı uygulamaların raporlarını ve rapor dosyalarını görebilir. Kota/yayın rakamları otomatik gelmez; Oda Asistanı rapora bakarak her yayıncı için yayın yaptı mı, kota eksiği var mı, iletişim kuruldu mu, etkinlik/PK yönlendirmesi ve motivasyon desteği gerekip gerekmediğini günlük takip formuna işler. Sayısal raporu yeniden girmesi gerekmez.
+- Oda Asistanı çözemediği konuyu takip kaydında yazar; kayıt ilgili uygulamanın danışmanına (Baş Asistanına) ve yöneticiye görünür. Danışman çözüm notu girip konuyu kapatabilir. Oda Asistanı kendi oluşturduğu takip kayıtlarını düzenler; silme yalnızca yöneticiye açıktır.
+- Mevcut Supabase projesinde `supabase/migrations/2026-11-25-room-assistant-operations.sql` dosyasını SQL Editor'de bir kez çalıştır. Sonra güncel panel dosyalarını GitHub'a yükle. Yeni Oda Asistanı kullanıcıları açabilmek için paketteki `supabase/functions/manage-users/index.ts` kodunu Supabase Edge Functions'taki `manage-users` işlevine yükleyip yeniden dağıt.
 
 ## Bu sürümün sınırı
 

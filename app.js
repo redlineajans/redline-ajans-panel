@@ -67,7 +67,7 @@ function weekDates() {
   const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
   return { start:dateInputValue(monday), end:dateInputValue(sunday) };
 }
-function roleName(role) { return ({admin:'Yönetici',assistant:'Asistan / Kayıtçı',consultant:'Danışman',subagency_owner:'Alt ajans sahibi',host:'Sunucu'})[role] || role; }
+function roleName(role) { return ({admin:'Yönetici',assistant:'Asistan / Kayıtçı',consultant:'Danışman',subagency_owner:'Alt ajans sahibi',host:'Sunucu',room_assistant:'Oda Asistanı'})[role] || role; }
 function visibleName(person) { return person?.display_name?.trim() || person?.full_name || '—'; }
 function statusName(value) { return ({new:'Yeni',contacted:'İletişim kuruldu',reviewing:'Değerlendirmede',accepted:'Kabul edildi',declined:'Uygun değil',active:'Aktif',paused:'Duraklatıldı',left:'Ayrıldı',review:'Kontrol edilecek',inactive:'Pasif'})[value] || value; }
 
@@ -123,16 +123,17 @@ async function loadProfiles() {
 
 function buildNav() {
   const entries = [{heading:'ÇALIŞMA ALANI'},{id:'overview',icon:'▦',name:'Genel Bakış'}];
-  if (['admin','consultant','subagency_owner'].includes(profile.role)) entries.push({id:'reports',icon:'▤',name:'Raporlar'});
+  if (['admin','consultant','subagency_owner','room_assistant'].includes(profile.role)) entries.push({id:'reports',icon:'▤',name:'Raporlar'});
   if (profile.role==='admin') entries.push({id:'payments',icon:'＄',name:'Çalışan Ödeme Tablosu'});
-  else if (['assistant','consultant','host'].includes(profile.role)) entries.push({id:'my-payments',icon:'✓',name:'Ödeme Durumum'});
+  else if (['assistant','consultant','host','room_assistant'].includes(profile.role)) entries.push({id:'my-payments',icon:'✓',name:'Ödeme Durumum'});
   if (['admin','subagency_owner'].includes(profile.role)) entries.push({id:'finance',icon:'₺',name:'Gelir & Gider'});
-  if(profile.role!=='host')entries.push({id:'performance',icon:'↗',name:'Performans'});
+  if(!['host','room_assistant'].includes(profile.role))entries.push({id:'performance',icon:'↗',name:'Performans'});
   if(['admin','consultant','host'].includes(profile.role))entries.push({id:'host-performance',icon:'✓',name:'Sunucu Performansı'});
+  if(['admin','consultant','room_assistant'].includes(profile.role))entries.push({id:'room-operations',icon:'◎',name:'Oda Operasyonları'});
   if (['admin','assistant','consultant'].includes(profile.role)) entries.push({id:'referrals',icon:'↗',name:'Referans Kayıtları'});
   if (['admin','consultant','host'].includes(profile.role)) entries.push({id:'pk',icon:'★',name:'PK Takip'});
   if (profile.role === 'admin') entries.push({id:'users',icon:'♧',name:'Kullanıcı Yönetimi'});
-  if(profile.role!=='host'){
+  if(!['host','room_assistant'].includes(profile.role)){
     entries.push({heading:'UYGULAMALAR'});
     platforms.forEach(p=>entries.push({id:`platform:${p.id}`,icon:p.name.slice(0,1).toUpperCase(),name:p.name,status:p.status}));
   }
@@ -143,10 +144,11 @@ function buildNav() {
 
 async function openPage(id) {
   if(profile.role==='host'&&!['overview','my-payments','pk','host-performance'].includes(id))return openPage('overview');
-  if(profile.role==='consultant'&&!['overview','reports','my-payments','performance','referrals','pk','host-performance'].includes(id))return openPage('overview');
+  if(profile.role==='consultant'&&!['overview','reports','my-payments','performance','referrals','pk','host-performance','room-operations'].includes(id))return openPage('overview');
+  if(profile.role==='room_assistant'&&!['overview','reports','room-operations','my-payments'].includes(id))return openPage('overview');
   currentPage=id;
   const platform = id.startsWith('platform:') ? platforms.find(p=>p.id===id.split(':')[1]) : null;
-  const title = platform?.name || ({overview:'Genel Bakış',reports:'Raporlar',payments:'Çalışan Ödeme Tablosu','my-payments':'Ödeme Durumum',finance:'Gelir & Gider',performance:'Performans','host-performance':'Sunucu Performansı',referrals:'Referans Kayıtları',pk:'PK Takip',users:'Kullanıcı Yönetimi'}[id] || 'Panel');
+  const title = platform?.name || ({overview:'Genel Bakış',reports:'Raporlar',payments:'Çalışan Ödeme Tablosu','my-payments':'Ödeme Durumum',finance:'Gelir & Gider',performance:'Performans','host-performance':'Sunucu Performansı','room-operations':'Oda Operasyonları',referrals:'Referans Kayıtları',pk:'PK Takip',users:'Kullanıcı Yönetimi'}[id] || 'Panel');
   document.querySelector('#breadcrumb').textContent=title;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
   msg('');
@@ -158,6 +160,7 @@ async function openPage(id) {
   if (id==='finance') return renderFinance();
   if (id==='performance') return renderPerformance();
   if (id==='host-performance') return renderHostPerformance();
+  if (id==='room-operations') return renderRoomOperations();
   if (id==='referrals') return renderReferrals();
   if (id==='pk') return renderPkEvents();
   if (id==='users') return renderUsers();
@@ -170,6 +173,11 @@ function table(headers, rows, empty='Henüz kayıt yok.') { return `<div class="
 function platformOptions(selected='',includeAll=false) { return `<option value="">Platform seç</option>${includeAll?'<option value="all">Hepsi / Genel kayıt</option>':''}${platforms.map(p=>`<option value="${p.id}" ${p.id===selected?'selected':''}>${esc(p.name)}</option>`).join('')}`; }
 function roleUsersOptions(selected='') { return `<option value="">Kendime ata</option>${profiles.filter(p=>p.active).map(p=>`<option value="${p.id}" ${p.id===selected?'selected':''}>${esc(visibleName(p))} · ${esc(roleName(p.role))}</option>`).join('')}`; }
 async function renderOverview() {
+  if(profile.role==='room_assistant') {
+    page.innerHTML=`${titleBlock('Genel Bakış','Sana atanmış uygulamaların raporlarını ve günlük yayıncı takiplerini buradan yönet.')}<div class="columns"><article class="card"><h2>Raporlar</h2><p>Yöneticinin yüklediği günlük ve haftalık uygulama raporlarını görüntüle.</p><button class="button" data-open="reports">Raporları aç</button></article><article class="card"><h2>Oda Operasyonları</h2><p>Yayıncılarla yaptığın günlük takibi kaydet; çözemediğin konuyu danışmana ilet.</p><button class="button primary" data-open="room-operations">Takip ekranını aç</button></article></div>`;
+    page.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',()=>openPage(button.dataset.open)));
+    return;
+  }
   if(profile.role==='host') {
     page.innerHTML=`${titleBlock('Genel Bakış','Buradan PK programlarını, tamamlanan sunumlarını ve ödeme durumunu takip edebilirsin.')}<div class="columns"><article class="card"><h2>PK Takip</h2><p>Sana atanmış PK programlarını, afişleri ve sunum durumunu görüntüle.</p><button class="button primary" data-open="pk">PK Takip’i aç</button></article><article class="card"><h2>Sunucu Performansı</h2><p>Sunumunu yaptığın PK kayıtlarını görüntüle.</p><button class="button" data-open="host-performance">Sunucu performansını aç</button></article><article class="card"><h2>Ödeme Durumum</h2><p>Ödemelerinin ödendi / ödenmedi durumunu görüntüle.</p><button class="button" data-open="my-payments">Ödeme durumunu aç</button></article></div>`;
     page.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',()=>openPage(button.dataset.open)));
@@ -205,7 +213,7 @@ async function renderCreators() {
 }
 
 async function renderReports() {
-  if (!['admin','consultant','subagency_owner'].includes(profile.role)) {
+  if (!['admin','consultant','subagency_owner','room_assistant'].includes(profile.role)) {
     page.innerHTML=titleBlock('Raporlar','Bu bölüm bu kullanıcı rolüne açık değil.')+`<div class="empty">Kendi haftalık raporlarını Performans bölümünde görebilirsin.</div>`;
     return;
   }
@@ -218,10 +226,17 @@ async function renderReports() {
   const {data,error}=await db.from('platform_reports').select('*,platforms(name),agencies(name)').order('period_start',{ascending:false}).order('created_at',{ascending:false}).limit(500);
   if(error)return page.innerHTML=titleBlock('Raporlar','Uygulamaya ve döneme göre filtrelenmiş dosya raporları.')+`<div class="empty">${esc(error.message)}<br>Rapor arşivi için Supabase güncellemesi henüz çalıştırılmamış olabilir.</div>`;
   const rows=data||[];
+  let visiblePlatforms=platforms;
+  if(profile.role==='room_assistant') {
+    const {data:assignmentRows,error:assignmentError}=await db.from('consultant_platforms').select('platform_id').eq('user_id',profile.id);
+    if(assignmentError)return page.innerHTML=titleBlock('Raporlar','Yalnızca atanmış uygulamaların raporları.')+`<div class="empty">${esc(assignmentError.message)}</div>`;
+    const assignedIds=new Set((assignmentRows||[]).map(row=>row.platform_id));
+    visiblePlatforms=platforms.filter(item=>assignedIds.has(item.id));
+  }
   const fileTypes='Excel (.xlsx, .xls, .csv), PDF veya görsel (.jpg, .png, .webp, .gif)';
   page.innerHTML=`${titleBlock('Raporlar','Dosyaları uygulama, rapor türü, dönem ve ajansa göre görüntüle.',profile.role==='admin'?'<button class="button primary" id="toggle-report-form">＋ Rapor yükle</button>':'')}
     ${profile.role==='admin'?`<article id="report-form-box" class="card hidden"><h2>Rapor dosyası yükle</h2><p>${fileTypes} · Dosya başına en fazla 20 MB. Raporlar yalnızca yetkili hesaplara gösterilir.</p><form id="report-form" class="form-grid"><label class="field">Başlık<input name="title" maxlength="120" placeholder="Boş bırakılırsa dosya adı kullanılır"></label><label class="field">Uygulama<select name="platform_id" required>${platformOptions()}</select></label><label class="field">Rapor türü<select name="report_type"><option value="daily">Günlük</option><option value="weekly">Haftalık</option></select></label><label class="field">Alt ajans<select name="agency_id"><option value="">Merkez / ajansa özel değil</option>${agencies.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></label><label class="field">Dönem başlangıcı<input name="period_start" type="date" value="${today()}" required></label><label class="field">Dönem bitişi<input name="period_end" type="date" value="${today()}" required></label><label class="field full">Rapor dosyası<input name="file" type="file" accept=".xlsx,.xls,.csv,.pdf,.jpg,.jpeg,.png,.webp,.gif,application/pdf,image/jpeg,image/png,image/webp,image/gif,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></label><label class="field full">Açıklama (isteğe bağlı)<textarea name="notes" rows="2" maxlength="1000" placeholder="Raporla ilgili kısa not"></textarea></label><div class="form-actions full"><button class="button primary" type="submit" id="report-submit">Yükle</button><button class="button" type="button" id="cancel-report">Vazgeç</button></div></form></article>`:''}
-    <div class="section-head"><strong>Rapor arşivi</strong><div class="form-grid report-filters"><label class="field">Uygulama<select id="report-filter-platform"><option value="all">Tüm uygulamalar</option>${platforms.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label><label class="field">Tür<select id="report-filter-type"><option value="all">Günlük ve haftalık</option><option value="daily">Günlük</option><option value="weekly">Haftalık</option></select></label></div></div>
+    <div class="section-head"><strong>Rapor arşivi</strong><div class="form-grid report-filters"><label class="field">Uygulama<select id="report-filter-platform"><option value="all">Tüm uygulamalar</option>${visiblePlatforms.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label><label class="field">Tür<select id="report-filter-type"><option value="all">Günlük ve haftalık</option><option value="daily">Günlük</option><option value="weekly">Haftalık</option></select></label></div></div>
     <article class="card" id="report-table-card"></article>`;
 
   const drawRows=()=>{
@@ -262,6 +277,58 @@ async function renderReports() {
   });
 }
 
+async function renderRoomOperations() {
+  if(!['admin','consultant','room_assistant'].includes(profile.role)) {
+    page.innerHTML=titleBlock('Oda Operasyonları','Bu bölüm için yetkin yok.')+'<div class="empty">Bu ekran yönetici, danışman ve oda asistanına açıktır.</div>';
+    return;
+  }
+  let assignedIds=null;
+  if(profile.role!=='admin') {
+    const {data:assignments,error:assignmentError}=await db.from('consultant_platforms').select('platform_id').eq('user_id',profile.id);
+    if(assignmentError)return page.innerHTML=titleBlock('Oda Operasyonları','Uygulama erişimleri yüklenemedi.')+`<div class="empty">${esc(assignmentError.message)}</div>`;
+    assignedIds=new Set((assignments||[]).map(x=>x.platform_id));
+  }
+  const allowedPlatforms=profile.role==='admin'?platforms:platforms.filter(p=>assignedIds.has(p.id));
+  const [{data:reports,error:reportError},{data:records,error}] = await Promise.all([
+    db.from('platform_reports').select('id,title,platform_id,report_type,period_start,period_end,storage_path,original_filename').order('period_start',{ascending:false}).limit(500),
+    db.from('room_assistant_followups').select('*,platforms(name)').order('follow_up_date',{ascending:false}).order('created_at',{ascending:false}).limit(500)
+  ]);
+  if(error)return page.innerHTML=titleBlock('Oda Operasyonları','Günlük yayıncı takibi ve yönlendirmeler.')+`<div class="empty">${esc(error.message)}<br>Oda Asistanı SQL güncellemesi henüz çalıştırılmamış olabilir.</div>`;
+  if(reportError)return page.innerHTML=titleBlock('Oda Operasyonları','Yüklenen raporlar alınamadı.')+`<div class="empty">${esc(reportError.message)}</div>`;
+  const rows=records||[];const allowedIds=new Set(allowedPlatforms.map(p=>p.id));
+  const visibleReports=(reports||[]).filter(r=>allowedIds.has(r.platform_id));
+  const reportOptions=(platformId,selected='')=>`<option value="">Yok — rapora bağlama</option>${visibleReports.filter(r=>r.platform_id===platformId).map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>${esc(r.title||r.original_filename)} · ${r.report_type==='daily'?'Günlük':'Haftalık'} · ${niceDate(r.period_start)}</option>`).join('')}`;
+  const statusOptions=(name,items,value)=>`<select name="${name}">${items.map(([v,label])=>`<option value="${v}" ${v===value?'selected':''}>${label}</option>`).join('')}</select>`;
+  const defaultPlatform=allowedPlatforms[0]?.id||'';
+  const renderRows=()=>{
+    const selectedPlatform=document.querySelector('#room-filter-platform')?.value||'all';
+    const selectedDate=document.querySelector('#room-filter-date')?.value||'';
+    const visible=rows.filter(r=>(selectedPlatform==='all'||r.platform_id===selectedPlatform)&&(!selectedDate||r.follow_up_date===selectedDate));
+    document.querySelector('#room-followups').innerHTML=table(['Tarih','Uygulama','Yayıncı','Yayın durumu','Kota kontrolü','İletişim','Yönlendirme','Motivasyon','Takip notu','Sorun / Baş Asistan','Kaydı giren','İşlem'],visible.map(r=>{
+      const canEdit=profile.role==='admin'||(profile.role==='room_assistant'&&r.created_by===profile.id);
+      const escalation=r.escalation_status==='pending'?'Baş Asistana iletildi':r.escalation_status==='resolved'?'Çözüldü':'Yok';
+      const resolution=r.lead_resolution?`<small class="small">Çözüm: ${esc(r.lead_resolution)}</small>`:'';
+      return `<tr><td>${niceDate(r.follow_up_date)}</td><td>${esc(r.platforms?.name||'—')}</td><td>${esc(r.publisher_name)}<small class="small">ID: ${esc(r.publisher_id)}</small></td><td>${({streamed:'Yayın yaptı',not_streamed:'Yayın yapmadı',unknown:'Kontrol edilmedi'})[r.broadcast_status]}</td><td>${({on_track:'Kotası uygun',short:'Kota eksiği',unknown:'Kontrol edilmedi'})[r.quota_status]}</td><td>${({contacted:'Görüşüldü',unreachable:'Ulaşılamadı',pending:'Bekliyor'})[r.contact_status]}</td><td>${({none:'—',pk:'PK',event:'Etkinlik',room_activity:'Oda aktivitesi'})[r.activity_invitation]}</td><td>${r.motivation_status==='low'?'Birebir destek gerekli':'Normal'}</td><td>${esc(r.action_notes||'—')}</td><td><span class="pill ${r.escalation_status==='pending'?'review':''}">${escalation}</span>${r.issue_note?`<small class="small">${esc(r.issue_note)}</small>`:''}${resolution}${profile.role==='consultant'&&r.escalation_status==='pending'?`<button class="button" data-resolve-followup="${r.id}">Çözüm gir</button>`:''}</td><td>${esc(r.created_by_name||'—')}</td><td>${canEdit?`<button class="button" data-edit-followup="${r.id}">Düzenle</button>`:''}${profile.role==='admin'?` <button class="button" data-delete-followup="${r.id}">Sil</button>`:'—'}</td></tr>`;
+    }),'Bu filtrelerde günlük takip kaydı yok.');
+    document.querySelectorAll('[data-edit-followup]').forEach(b=>b.addEventListener('click',()=>fillForm(rows.find(r=>r.id===b.dataset.editFollowup))));
+    document.querySelectorAll('[data-delete-followup]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Bu günlük takip kaydını silmek istiyor musun?'))return;const {error:deleteError}=await db.from('room_assistant_followups').delete().eq('id',b.dataset.deleteFollowup);if(deleteError)return msg(deleteError.message,true);msg('Takip kaydı silindi.');renderRoomOperations();}));
+    document.querySelectorAll('[data-resolve-followup]').forEach(b=>b.addEventListener('click',async()=>{const resolution=prompt('Baş Asistan çözümünü veya yönlendirme notunu yaz:');if(!resolution?.trim())return;const {error:resolveError}=await db.rpc('resolve_room_assistant_followup',{p_followup_id:b.dataset.resolveFollowup,p_resolution:resolution.trim()});if(resolveError)return msg(resolveError.message,true);msg('Konu çözüldü olarak kaydedildi.');renderRoomOperations();}));
+  };
+  page.innerHTML=`${titleBlock('Oda Operasyonları','Günlük yayıncı takibini, kota kontrolünü ve Baş Asistana iletilen konuları kaydet.',profile.role==='room_assistant'?'<button class="button primary" id="toggle-room-form">＋ Günlük takip ekle</button>':'')}
+    <article id="room-form-box" class="card ${profile.role==='room_assistant'?'hidden':''}"><h2 id="room-form-title">Günlük yayıncı takibi</h2><p>Kota sayısı girilmez. Yüklenen günlük/haftalık rapora bakıp kontrol durumunu seç; sayısal verileri rapor dosyasında tut.</p><form id="room-form" class="form-grid"><input type="hidden" name="record_id"><label class="field">Uygulama<select name="platform_id" required>${allowedPlatforms.map(p=>`<option value="${p.id}" ${p.id===defaultPlatform?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label><label class="field">Takip tarihi<input name="follow_up_date" type="date" value="${today()}" required></label><label class="field">Yayıncı ID<input name="publisher_id" maxlength="100" required></label><label class="field">Yayıncı adı<input name="publisher_name" maxlength="120" required></label><label class="field">İlgili yüklenmiş rapor<select name="source_report_id">${reportOptions(defaultPlatform)}</select></label><label class="field">Günlük yayın durumu${statusOptions('broadcast_status',[['unknown','Kontrol edilmedi'],['streamed','Yayın yaptı'],['not_streamed','Yayın yapmadı']],'unknown')}</label><label class="field">Kota kontrolü${statusOptions('quota_status',[['unknown','Kontrol edilmedi'],['on_track','Kotası uygun'],['short','Kota eksiği var']],'unknown')}</label><label class="field">İletişim durumu${statusOptions('contact_status',[['pending','Henüz görüşülmedi'],['contacted','Görüşüldü'],['unreachable','Ulaşılamadı']],'pending')}</label><label class="field">Yönlendirme${statusOptions('activity_invitation',[['none','Yok'],['pk','PK'],['event','Etkinlik'],['room_activity','Oda aktivitesi']],'none')}</label><label class="field">Motivasyon<select name="motivation_status"><option value="normal">Normal</option><option value="low">Birebir destek gerekli</option></select></label><label class="field full">Yapılan takip / aksiyon notu<textarea name="action_notes" rows="2" maxlength="1500"></textarea></label><label class="field full">Sorun veya Baş Asistana iletilecek konu<textarea name="issue_note" rows="2" maxlength="1500" placeholder="Çözemediğin bir konu varsa buraya yaz"></textarea></label><div class="form-actions full"><button class="button primary" id="room-save">Kaydet</button><button class="button" type="button" id="room-cancel">Vazgeç</button></div></form></article>
+    <div class="section-head"><strong>Günlük yayıncı takipleri</strong><div class="form-grid report-filters"><label class="field">Uygulama<select id="room-filter-platform"><option value="all">Tüm yetkili uygulamalar</option>${allowedPlatforms.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label><label class="field">Tarih<input id="room-filter-date" type="date"></label></div></div><article class="card" id="room-followups"></article>`;
+  if(profile.role==='consultant')document.querySelector('#room-form-box').classList.add('hidden');
+  const form=document.querySelector('#room-form');
+  const resetForm=()=>{form.reset();form.elements.record_id.value='';form.elements.follow_up_date.value=today();if(defaultPlatform)form.elements.platform_id.value=defaultPlatform;form.elements.source_report_id.innerHTML=reportOptions(form.elements.platform_id.value);form.elements.broadcast_status.value='unknown';form.elements.quota_status.value='unknown';form.elements.contact_status.value='pending';form.elements.activity_invitation.value='none';form.elements.motivation_status.value='normal';document.querySelector('#room-form-title').textContent='Günlük yayıncı takibi';document.querySelector('#room-save').textContent='Kaydet';if(profile.role==='room_assistant')document.querySelector('#room-form-box').classList.add('hidden');};
+  const fillForm=r=>{if(!r)return;form.elements.record_id.value=r.id;form.elements.platform_id.value=r.platform_id;form.elements.follow_up_date.value=r.follow_up_date;form.elements.publisher_id.value=r.publisher_id;form.elements.publisher_name.value=r.publisher_name;form.elements.source_report_id.innerHTML=reportOptions(r.platform_id,r.source_report_id||'');form.elements.broadcast_status.value=r.broadcast_status;form.elements.quota_status.value=r.quota_status;form.elements.contact_status.value=r.contact_status;form.elements.activity_invitation.value=r.activity_invitation;form.elements.motivation_status.value=r.motivation_status;form.elements.action_notes.value=r.action_notes||'';form.elements.issue_note.value=r.issue_note||'';document.querySelector('#room-form-title').textContent='Günlük takip kaydını düzenle';document.querySelector('#room-save').textContent='Değişiklikleri kaydet';document.querySelector('#room-form-box').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});};
+  document.querySelector('#room-filter-platform').addEventListener('change',renderRows);document.querySelector('#room-filter-date').addEventListener('change',renderRows);
+  document.querySelector('#toggle-room-form')?.addEventListener('click',()=>document.querySelector('#room-form-box').classList.toggle('hidden'));
+  document.querySelector('#room-cancel').addEventListener('click',resetForm);
+  form.elements.platform_id.addEventListener('change',()=>form.elements.source_report_id.innerHTML=reportOptions(form.elements.platform_id.value));
+  form.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(form);const platformId=f.get('platform_id');if(!allowedIds.has(platformId))return msg('Bu uygulama için yetkin yok.',true);const issue=String(f.get('issue_note')||'').trim();const old=rows.find(r=>r.id===f.get('record_id'));const payload={platform_id:platformId,follow_up_date:f.get('follow_up_date'),publisher_id:String(f.get('publisher_id')).trim(),publisher_name:String(f.get('publisher_name')).trim(),source_report_id:f.get('source_report_id')||null,broadcast_status:f.get('broadcast_status'),quota_status:f.get('quota_status'),contact_status:f.get('contact_status'),activity_invitation:f.get('activity_invitation'),motivation_status:f.get('motivation_status'),action_notes:String(f.get('action_notes')||'').trim()||null,issue_note:issue||null,escalation_status:issue?(old?.escalation_status==='resolved'?'resolved':'pending'):'none',lead_resolution:issue?(old?.lead_resolution||null):null,created_by:old?.created_by||profile.id,created_by_name:old?.created_by_name||visibleName(profile)};const id=f.get('record_id');const query=id?db.from('room_assistant_followups').update(payload).eq('id',id):db.from('room_assistant_followups').insert(payload);const {error:saveError}=await query;if(saveError)return msg(saveError.message,true);msg(id?'Günlük takip güncellendi.':'Günlük takip kaydedildi.');await renderRoomOperations();});
+  renderRows();
+}
+
 async function renderFinance() {
   const {data,error}=await db.from('financial_entries').select('*,platforms(name),agencies(name)').order('occurred_on',{ascending:false}).limit(200);
   if(error) return page.innerHTML=titleBlock('Gelir & Gider','Finans kayıtları.')+`<div class="empty">${esc(error.message)}</div>`;
@@ -284,7 +351,7 @@ function monthDates() {
 }
 
 async function renderMyPaymentStatus() {
-  if(!['assistant','consultant','host'].includes(profile.role)) {
+  if(!['assistant','consultant','host','room_assistant'].includes(profile.role)) {
     page.innerHTML=titleBlock('Ödeme Durumum','Bu bölüm çalışan hesaplarına açıktır.')+`<div class="empty">Bu kullanıcı rolü için ödeme durumu bulunmuyor.</div>`;
     return;
   }
@@ -511,10 +578,10 @@ async function renderUsers() {
   const {data:assignmentRows,error:assignmentError}=await db.from('consultant_platforms').select('user_id,platform_id');
   if(assignmentError)return page.innerHTML=titleBlock('Kullanıcı Yönetimi','Çalışan ve alt ajans hesaplarını yönet.')+`<div class="empty">${esc(assignmentError.message)}<br>Önce Raporlar güncellemesinin SQL dosyasını çalıştır.</div>`;
   const assignmentMap=new Map();(assignmentRows||[]).forEach(r=>{if(!assignmentMap.has(r.user_id))assignmentMap.set(r.user_id,[]);assignmentMap.get(r.user_id).push(r.platform_id);});
-  const rows=profiles.map(p=>`<tr><td><strong>${esc(visibleName(p))}</strong><small class="small">${p.display_name?'Panelde görünen ad':'Ad soyad varsayılanı'}</small></td><td>${esc(p.username)}</td><td>${esc(p.email)}</td><td>${esc(p.phone||'—')}</td><td>${esc(roleName(p.role))}</td><td><span class="pill ${p.active?'':'review'}">${p.active?'Aktif':'Kapalı'}</span></td><td>${p.role==='consultant'?`<button class="button" data-assign-platforms="${p.id}">Uygulamaları ata</button> `:''}${p.id!==profile.id?`${p.active?`<button class="button" data-disable="${p.id}">Kapat</button>`:`<button class="button" data-activate="${p.id}">Aç</button>`} <button class="button" data-reset="${p.id}">Parola yenile</button> `:''}<button class="button" data-edit-display-name="${p.id}">Görünen adı düzenle</button></td></tr>`);
+  const rows=profiles.map(p=>`<tr><td><strong>${esc(visibleName(p))}</strong><small class="small">${p.display_name?'Panelde görünen ad':'Ad soyad varsayılanı'}</small></td><td>${esc(p.username)}</td><td>${esc(p.email)}</td><td>${esc(p.phone||'—')}</td><td>${esc(roleName(p.role))}</td><td><span class="pill ${p.active?'':'review'}">${p.active?'Aktif':'Kapalı'}</span></td><td>${['consultant','room_assistant'].includes(p.role)?`<button class="button" data-assign-platforms="${p.id}">Uygulamaları ata</button> `:''}${p.id!==profile.id?`${p.active?`<button class="button" data-disable="${p.id}">Kapat</button>`:`<button class="button" data-activate="${p.id}">Aç</button>`} <button class="button" data-reset="${p.id}">Parola yenile</button> `:''}<button class="button" data-edit-display-name="${p.id}">Görünen adı düzenle</button></td></tr>`);
   page.innerHTML=`${titleBlock('Kullanıcı Yönetimi','Çalışan ve alt ajans hesaplarını yalnızca sen yönetebilirsin.','<button class="button primary" id="toggle-form">＋ Kullanıcı oluştur</button>')}
-    <article id="assignment-box" class="card hidden"><h2 id="assignment-title">Danışman uygulama yetkileri</h2><p>Danışmanlar yalnızca seçilen uygulamalara ait yüklenmiş raporları görebilir.</p><div id="assigned-platforms" class="platform-checks"></div><div class="form-actions"><button class="button primary" id="save-platform-assignment">Yetkileri kaydet</button><button class="button" type="button" id="cancel-platform-assignment">Vazgeç</button></div></article>
-    <article id="create-box" class="card hidden"><h2>Yeni hesap</h2><p>Geçici parolayı güvenli biçimde çalışana ilet. İlk girişte parola değişimi zorunlu olur.</p><form id="user-form" class="form-grid"><label class="field">Gerçek ad soyad<input name="full_name" required></label><label class="field">Telefon<input name="phone" type="tel"></label><label class="field">E-posta<input name="email" type="email" required></label><label class="field">Kullanıcı adı<input name="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]+"></label><label class="field">Rol<select name="role"><option value="assistant">Asistan / Kayıtçı</option><option value="consultant">Danışman</option><option value="host">Sunucu</option><option value="subagency_owner">Alt ajans sahibi</option></select></label><label id="agency-field" class="field hidden">Ajans adı<input name="agency_name"></label><label class="field full">İlk giriş parolası<input name="password" type="password" minlength="12" autocomplete="new-password" required><small class="small">En az 12 karakter. İlk girişte değiştirilmesi istenir.</small></label><div class="form-actions full"><button class="button primary">Hesap oluştur</button><button class="button" type="button" id="cancel-form">Vazgeç</button></div></form></article>
+    <article id="assignment-box" class="card hidden"><h2 id="assignment-title">Uygulama yetkileri</h2><p>Atanan uygulamaların raporları ve operasyon kayıtları bu hesaba açılır.</p><div id="assigned-platforms" class="platform-checks"></div><div class="form-actions"><button class="button primary" id="save-platform-assignment">Yetkileri kaydet</button><button class="button" type="button" id="cancel-platform-assignment">Vazgeç</button></div></article>
+    <article id="create-box" class="card hidden"><h2>Yeni hesap</h2><p>Geçici parolayı güvenli biçimde çalışana ilet. İlk girişte parola değişimi zorunlu olur.</p><form id="user-form" class="form-grid"><label class="field">Gerçek ad soyad<input name="full_name" required></label><label class="field">Telefon<input name="phone" type="tel"></label><label class="field">E-posta<input name="email" type="email" required></label><label class="field">Kullanıcı adı<input name="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]+"></label><label class="field">Rol<select name="role"><option value="assistant">Asistan / Kayıtçı</option><option value="room_assistant">Oda Asistanı</option><option value="consultant">Danışman</option><option value="host">Sunucu</option><option value="subagency_owner">Alt ajans sahibi</option></select></label><label id="agency-field" class="field hidden">Ajans adı<input name="agency_name"></label><label class="field full">İlk giriş parolası<input name="password" type="password" minlength="12" autocomplete="new-password" required><small class="small">En az 12 karakter. İlk girişte değiştirilmesi istenir.</small></label><div class="form-actions full"><button class="button primary">Hesap oluştur</button><button class="button" type="button" id="cancel-form">Vazgeç</button></div></form></article>
     <article class="card">${table(['Panelde görünen ad','Kullanıcı adı','E-posta','Telefon','Rol','Hesap','İşlem'],rows,'Henüz personel hesabı yok.')}</article>`;
   wireFormToggle();
   const roleSelect=document.querySelector('#user-form [name="role"]');
@@ -522,7 +589,7 @@ async function renderUsers() {
   document.querySelector('#user-form').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const payload={action:'create',full_name:f.get('full_name'),phone:f.get('phone'),email:f.get('email'),username:f.get('username'),password:f.get('password'),role:f.get('role'),agency_name:f.get('agency_name')};const result=await invoke('manage-users',payload);if(!result.ok)return msg(result.error||'Hesap açılamadı.',true);msg(`Hesap oluşturuldu. Kullanıcı adı: ${result.username}`);await renderUsers();});
   page.querySelectorAll('[data-edit-display-name]').forEach(button=>button.addEventListener('click',async()=>{const person=profiles.find(p=>p.id===button.dataset.editDisplayName);if(!person)return;const value=prompt('Bu hesap için panelde görünecek adı yaz. Boş bırakırsan gerçek ad-soyad görünür.',person.display_name||person.full_name);if(value===null)return;const displayName=value.trim();if(displayName.length>80)return msg('Görünen ad en fazla 80 karakter olabilir.',true);const {error}=await db.from('profiles').update({display_name:displayName||null}).eq('id',person.id);if(error)return msg(error.message,true);msg('Panelde görünen ad güncellendi.');await renderUsers();if(person.id===profile.id){profile.display_name=displayName||null;document.querySelector('#user-name').textContent=visibleName(profile);document.querySelector('#user-avatar').textContent=visibleName(profile).split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase();}}));
   let assignmentUserId='';
-  page.querySelectorAll('[data-assign-platforms]').forEach(button=>button.addEventListener('click',()=>{assignmentUserId=button.dataset.assignPlatforms;const person=profiles.find(p=>p.id===assignmentUserId);document.querySelector('#assignment-title').textContent=`${visibleName(person)||'Danışman'} · Uygulama yetkileri`;const assigned=new Set(assignmentMap.get(assignmentUserId)||[]);document.querySelector('#assigned-platforms').innerHTML=platforms.map(p=>`<label class="platform-check"><input type="checkbox" value="${p.id}" ${assigned.has(p.id)?'checked':''}><span>${esc(p.name)}</span></label>`).join('')||'<div class="empty">Uygulama bulunamadı.</div>';document.querySelector('#assignment-box').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}));
+  page.querySelectorAll('[data-assign-platforms]').forEach(button=>button.addEventListener('click',()=>{assignmentUserId=button.dataset.assignPlatforms;const person=profiles.find(p=>p.id===assignmentUserId);document.querySelector('#assignment-title').textContent=`${visibleName(person)||roleName(person.role)} · Uygulama yetkileri`;const assigned=new Set(assignmentMap.get(assignmentUserId)||[]);document.querySelector('#assigned-platforms').innerHTML=platforms.map(p=>`<label class="platform-check"><input type="checkbox" value="${p.id}" ${assigned.has(p.id)?'checked':''}><span>${esc(p.name)}</span></label>`).join('')||'<div class="empty">Uygulama bulunamadı.</div>';document.querySelector('#assignment-box').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}));
   document.querySelector('#cancel-platform-assignment').addEventListener('click',()=>document.querySelector('#assignment-box').classList.add('hidden'));
   document.querySelector('#save-platform-assignment').addEventListener('click',async event=>{if(!assignmentUserId)return;const button=event.currentTarget;button.disabled=true;const selected=[...document.querySelectorAll('#assigned-platforms input:checked')].map(x=>x.value);const current=assignmentMap.get(assignmentUserId)||[];const added=selected.filter(id=>!current.includes(id));const removed=current.filter(id=>!selected.includes(id));if(added.length){const {error}=await db.from('consultant_platforms').insert(added.map(platform_id=>({user_id:assignmentUserId,platform_id,assigned_by:profile.id})));if(error){button.disabled=false;return msg(error.message,true);}}if(removed.length){const {error}=await db.from('consultant_platforms').delete().eq('user_id',assignmentUserId).in('platform_id',removed);if(error){button.disabled=false;return msg(error.message,true);}}msg('Danışmanın uygulama yetkileri güncellendi.');await renderUsers();});
   page.querySelectorAll('[data-disable]').forEach(button=>button.addEventListener('click',async()=>{if(!confirm('Bu kişinin panel erişimini kapatmak istiyor musun?'))return;const result=await invoke('manage-users',{action:'deactivate',user_id:button.dataset.disable});if(!result.ok)return msg(result.error||'Erişim kapatılamadı.',true);msg('Hesap erişimi kapatıldı.');renderUsers();}));
