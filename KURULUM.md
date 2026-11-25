@@ -16,6 +16,7 @@ Bu klasör, gerçek giriş ve kayıt sistemi için başlangıç paketidir. Aray�
 - `supabase/migrations/2026-11-17-weekly-referral-entries.sql`: uygulama ve haftaya bağlı referans kayıtlarını, danışman uygulama yetkisine göre korunan erişim kurallarıyla ekler.
 - `supabase/migrations/2026-11-17-pk-host-tracking.sql`: Sunucu rolü, özel PK afiş alanı ve uygulama yetkisine göre PK takibini ekler.
 - `supabase/migrations/2026-11-25-room-assistant-operations.sql`: Oda Asistanı rolünü, uygulama bazlı rapor erişimini ve günlük yayıncı takibi / Baş Asistana yönlendirme kayıtlarını ekler.
+- `supabase/migrations/2026-11-25-host-platform-pk-create.sql`: Sunucunun atandığı uygulamayı görmesini ve yalnızca kendisi adına PK kaydı oluşturup afiş ekleyebilmesini sağlar.
 - `supabase/functions/`: kullanıcı adıyla giriş, yönetici hesabı açma/kapatma ve ilk giriş parolası yenileme işlevleri.
 
 ## Kurulum sırası
@@ -110,11 +111,12 @@ Var olan Supabase projesi kullanılıyorsa SQL Editor'de, daha önce çalıştı
 ## Sunucular ve PK Takip
 
 - Kullanıcı Yönetimi'nde hesabı **Sunucu** rolüyle oluştur. Sunucuyu **Çalışan Ödeme Tablosu**nda ilgili uygulama grubuna ekle ve panel hesabıyla eşleştir. Böylece Sunucu hesabı yalnızca kendi PK programlarını ve eşleştirilen ödeme durumunu görür.
-- Yönetici ve danışmanlar PK adı, uygulama, tarih-saat, bir veya birden fazla sunucu, afiş, isteğe bağlı EVT takip kodu ve onay durumunu ekleyip düzenleyebilir. Danışman sadece kendisine atanmış uygulamaların PK kayıtlarını yönetir. Afiş onayını dış portaldan kontrol ettikten sonra panelde elle güncelle; panel dış portala bağlanmaz. Sunucular kayıt ekleyemez ve silemez.
+- Yönetici ve danışmanlar PK adı, uygulama, tarih-saat, bir veya birden fazla sunucu, afiş, isteğe bağlı EVT takip kodu ve onay durumunu ekleyip düzenleyebilir. Danışman sadece kendisine atanmış uygulamaların PK kayıtlarını yönetir. Sunucu kendisine atanmış uygulamada kendi adına PK ve afiş ekleyebilir; mevcut kayıtları düzenleyemez veya silemez. Afiş onayını dış portaldan kontrol ettikten sonra panelde yönetici/danışman elle günceller; panel dış portala bağlanmaz.
 - Afişler `pk-posters` adlı özel Storage alanında saklanır ve yalnızca ilgili PK kaydına yetkili hesaplarca görüntülenebilir. Afiş dosyası 20 MB'ı geçmemelidir.
 - Var olan Supabase projesinde `supabase/migrations/2026-11-17-pk-host-tracking.sql` dosyasını SQL Editor'de bir kez çalıştır. Sonra güncel panel dosyalarını GitHub deposunun ana dizinine yükle. Yeni **Sunucu** hesapları açabilmek için paketteki `supabase/functions/manage-users/index.ts` dosyasını Supabase Edge Functions'taki `manage-users` işlevine yükleyip yeniden dağıt.
 - Sunucu PK tamamlandıktan sonra kendisine atanmış kayıtta **Sunuldu** veya **Sunulmadı** seçip kaydedebilir. Yönetici ve ilgili danışman bu durumu görür. Sunucunun, yöneticinin ve danışmanın **Sunucu Performansı** bölümü yalnızca Sunuldu olarak işaretlenen kayıtları listeler; danışman yalnızca yetkili olduğu uygulamaları görür. Mevcut projede `supabase/migrations/2026-11-18-pk-presentation-status.sql` dosyasını bir kez çalıştır.
 - PK kaydı eklerken RLS hatası alınırsa supabase/migrations/2026-11-18-pk-create-event-rpc.sql dosyasını da bir kez çalıştır.
+- Sunucu **Uygulamalar** menüsünde, Çalışan Ödeme Tablosu'nda panel hesabıyla eşleştirildiği ve aktif olduğu uygulamaları görür. Yeni sunucu PK yetkisi için `supabase/migrations/2026-11-25-host-platform-pk-create.sql` dosyasını SQL Editor'de bir kez çalıştırıp güncel panel dosyalarını yayımla. Sunucu kendi adına PK ve afiş ekleyebilir; afiş onayı bekliyor olarak kaydedilir. PK'yı düzenleme ve silme yönetici/danışmanda kalır.
 
 ## Oda Asistanı ve günlük takip
 
